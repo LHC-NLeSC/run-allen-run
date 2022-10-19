@@ -9,6 +9,7 @@ import json
 from math import log2
 from pathlib import Path
 import re
+from typing import Union
 
 import mlflow
 import sh
@@ -26,7 +27,7 @@ ALLEN_CMD = [
 NUMBERS = re.compile("[0-9]+.[0-9]+")
 
 
-def shtrip(output: sh.RunningCommand | None) -> str:
+def shtrip(output: Union[sh.RunningCommand, None]) -> str:
     if output is None:
         return ""
     return repr(output).strip()
