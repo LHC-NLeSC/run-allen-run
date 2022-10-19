@@ -96,10 +96,12 @@ def runner(config_json: Path, max_batch_size: int, use_fp16: bool) -> dict[str, 
 
 def mlflow_run(expt_name, config_json, max_batch_size, use_fp16):
     expts = mlflow.search_experiments(filter_string=f"name = {expt_name!r}")
-    if len(expts) > 0:
-        expt_id = expts[0].experiment_id
-    else:
-        expt_id = mlflow.create_experiment(expt_name)
+    if not expts:
+        print("Couldn't find experiment, please setup using CLI")
+        return {}
+    expt_id = expts[0].experiment_id
+    # causes race condition when using multiprocessing
+    # expt_id = mlflow.create_experiment(expt_name)
 
     with mlflow.start_run(experiment_id=expt_id, tags={"branch": "ghostbuster"}):
         return runner(config_json, max_batch_size, use_fp16)
