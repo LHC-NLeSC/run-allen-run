@@ -48,10 +48,10 @@ def round_up_2(val: int) -> int:
     return val
 
 
-def param_matrix(max_batch_size: tuple[int, int], use_fp16: bool):
-    lo, hi = [round_up_2(i) for i in max_batch_size]
+def param_matrix(batch_size_range: tuple[int, int], fp16: bool):
+    lo, hi = [round_up_2(i) for i in batch_size_range]
     batch_sizes = (1 << i for i in range(int(log2(lo)), int(log2(hi) + 1)))
-    return product(batch_sizes, (True, False) if use_fp16 else (use_fp16,))
+    return product(batch_sizes, (True, False) if fp16 else (fp16,))
 
 
 def runner(config_json: Path, max_batch_size: int, use_fp16: bool) -> dict[str, float]:
@@ -94,7 +94,7 @@ def runner(config_json: Path, max_batch_size: int, use_fp16: bool) -> dict[str, 
     return metrics
 
 
-def mlflow_run(expt_name, config_json, max_batch_size, use_fp16):
+def mlflow_run(expt_name: str, config_json: Path, max_batch_size: int, use_fp16: bool):
     expts = mlflow.search_experiments(filter_string=f"name = {expt_name!r}")
     if not expts:
         print("Couldn't find experiment, please setup using CLI")
@@ -115,13 +115,11 @@ if __name__ == "__main__":
         "config_json", help="Config JSON, parent directory should have the binary"
     )
     parser.add_argument("--experiment-name", required=True)
-    parser.add_argument("--max-batch-size", nargs=2, type=int, help="Batch size range")
-    parser.add_argument(
-        "--use-fp16", action="store_true", help="Benchmark FP16 support"
-    )
+    parser.add_argument("--batch-size-range", nargs=2, type=int)
+    parser.add_argument("--fp16", action="store_true", help="Benchmark FP16 support")
     opts, rest = parser.parse_known_args()
     config_json = Path(opts.config_json)
-    params = tuple(param_matrix(opts.max_batch_size, opts.use_fp16))
+    params = tuple(param_matrix(opts.batch_size_range, opts.fp16))
     njobs = len(params)
 
     with ProcessPoolExecutor(2) as executor:
