@@ -28,6 +28,7 @@ NUMBERS = re.compile("[0-9]+.[0-9]+")
 
 
 def shtrip(output: Union[sh.RunningCommand, None]) -> str:
+    """Strip shell stdout of newlines & whitespace"""
     if output is None:
         return ""
     return repr(output).strip()
@@ -49,13 +50,59 @@ def round_up_2(val: int) -> int:
 
 
 def param_matrix(batch_size_range: tuple[int, int], fp16: bool):
+    """Create all permutations from a range of batch sizes, and fp16
+
+    Parameters
+    ----------
+    batch_size_range: tuple[int, int]
+
+      The range limits are rounded up to the nearest power of 2, and then
+      intermediate powers of two are filled in.
+
+    fp16: bool
+
+      If True, permutation also includes fp16 support set to True or False, it
+      is set to False otherwise
+
+    Returns
+    -------
+    product[tuple[int, bool]]
+
+    """
     lo, hi = [round_up_2(i) for i in batch_size_range]
     batch_sizes = (1 << i for i in range(int(log2(lo)), int(log2(hi) + 1)))
     return product(batch_sizes, (True, False) if fp16 else (fp16,))
 
 
 def runner(config_json: Path, max_batch_size: int, use_fp16: bool) -> dict[str, float]:
-    # FIXME: get runid, log parameters
+    """Run Allen with the provided parameters, and log the metrics w/ mlflow
+
+    Log files are saved in the run directory:
+    - configuration: config-<parameters>.json
+    - stdout: stdout-<parameters>.log
+    - parameters & metrics: meta-<parameters>.json
+
+    Parameters
+    ----------
+    config_json: Path
+
+      Path to the JSON configuration to use as template
+
+    max_batch_size: int
+
+      Maximum batch size for our algorithm ("GhostProbabilityNN")
+
+    use_fp16: bool
+
+      Whether to enable FP16 optimisation
+
+    Returns
+    -------
+    dict[str, float]
+
+      Metrics: {"event_rate": 123.456, "duration": 123.456}
+
+    """
     params = {"max_batch_size": max_batch_size, "use_fp16": use_fp16}
     mlflow.log_params(params)
     fname_part = f"batch-size-{max_batch_size}-fp16-{use_fp16}"
@@ -95,6 +142,7 @@ def runner(config_json: Path, max_batch_size: int, use_fp16: bool) -> dict[str, 
 
 
 def mlflow_run(expt_name: str, config_json: Path, max_batch_size: int, use_fp16: bool):
+    """Multiprocessing friendly wrapper to start an mlflow run"""
     expts = mlflow.search_experiments(filter_string=f"name = {expt_name!r}")
     if not expts:
         print("Couldn't find experiment, please setup using CLI")
@@ -103,6 +151,7 @@ def mlflow_run(expt_name: str, config_json: Path, max_batch_size: int, use_fp16:
     # causes race condition when using multiprocessing
     # expt_id = mlflow.create_experiment(expt_name)
 
+    # FIXME: add git metadata in tags
     with mlflow.start_run(experiment_id=expt_id, tags={"branch": "ghostbuster"}):
         return runner(config_json, max_batch_size, use_fp16)
 
