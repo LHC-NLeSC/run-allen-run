@@ -14,11 +14,12 @@ from typing import Union
 import mlflow
 import sh
 
-TEST_CMD = ["./foo.sh", "42 {config} --foo bar {batch} {fp16}"]
+TEST_CMD = ["../foo.sh", "42 {config} --foo bar"]
 
 ALLEN_CMD = [
-    "./toolchain/wrapper",
-    "./Allen -t 12 --events-per-slice 1000 -n 1000 -r 100 "
+    "../toolchain/wrapper",
+    "../Allen -g ../../input/detector_configuration/ "
+    "-t 12 --events-per-slice 1000 -n 1000 -r 100 "
     "--run-from-json 1 --sequence {config} "
     "--mdf /data/bfys/raaij/upgrade/MiniBrunel_2018_MinBias_FTv4_DIGI_retinacluster_v1.mdf",
 ]
@@ -107,15 +108,16 @@ def runner(config_json: Path, max_batch_size: int, use_fp16: bool) -> dict[str, 
     mlflow.log_params(params)
     fname_part = f"batch-size-{max_batch_size}-fp16-{use_fp16}"
 
-    bindir = config_json.parent
-    config_edited = bindir / f"config-{fname_part}.json"
+    rundir = config_json.parent / Path(f"run-{fname_part}")
+    rundir.mkdir(exist_ok=True)
+    config_edited = rundir / f"config-{fname_part}.json"
 
     config = json.loads(config_json.read_text())
     config["GhostProbabilityNN"]["max_batch_size"] = max_batch_size
     config["GhostProbabilityNN"]["use_fp16"] = use_fp16
     config_edited.write_text(json.dumps(config, indent=4))
 
-    with sh.cd(bindir):
+    with sh.cd(rundir):
         cmd, opts = ALLEN_CMD
         stdout = shtrip(
             sh.Command(cmd)(*opts.format(config=config_edited.name).split())
@@ -136,8 +138,8 @@ def runner(config_json: Path, max_batch_size: int, use_fp16: bool) -> dict[str, 
 
     mlflow.log_metrics(metrics)
     mlflow.log_artifact(f"{config_edited}")
-    mlflow.log_artifact(f"{bindir/log_file}")
-    mlflow.log_artifact(f"{bindir/meta_file}")
+    mlflow.log_artifact(f"{rundir/log_file}")
+    mlflow.log_artifact(f"{rundir/meta_file}")
     return metrics
 
 
