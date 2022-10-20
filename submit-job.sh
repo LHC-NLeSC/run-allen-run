@@ -1,5 +1,9 @@
 #!/bin/bash
 
+#PBS -l nodes=1:v100
+#PBS -l walltime=12:00:00
+#PBS -l mem=4gb
+
 pushd /project/bfys/suvayua/codebaby/run-allen-run || exit
 
 source lhcb-setup.sh
