@@ -166,7 +166,7 @@ if __name__ == "__main__":
     parser.add_argument("--experiment-name", required=True)
     parser.add_argument("--batch-size-range", nargs=2, type=int)
     parser.add_argument("--fp16", action="store_true", help="Benchmark FP16 support")
-    opts, rest = parser.parse_known_args()
+    opts = parser.parse_args()
     config_json = Path(opts.config_json)
     params = tuple(param_matrix(opts.batch_size_range, opts.fp16))
     njobs = len(params)
