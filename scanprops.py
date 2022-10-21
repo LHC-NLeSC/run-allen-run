@@ -6,6 +6,7 @@
 from itertools import product
 import json
 from math import log2
+import os
 from pathlib import Path
 import re
 from typing import Union
@@ -25,6 +26,8 @@ ALLEN_CMD = [
 
 
 NUMBERS = re.compile("[0-9]+.[0-9]+")
+
+ENV = os.environ.copy()
 
 
 def shtrip(output: Union[sh.RunningCommand, None]) -> str:
@@ -117,9 +120,11 @@ def runner(config_json: Path, max_batch_size: int, use_fp16: bool) -> dict[str, 
     config_edited.write_text(json.dumps(config, indent=4))
 
     with sh.cd(rundir):
+        env = ENV.copy()
+        env["CUDA_VISIBLE_DEVICES"] = "0"
         cmd, opts = ALLEN_CMD
         stdout = shtrip(
-            sh.Command(cmd)(*opts.format(config=config_edited.name).split())
+            sh.Command(cmd)(*opts.format(config=config_edited.name).split(), _env=env)
         )
         log_file = Path(f"stdout-{fname_part}.log")
         log_file.write_text(stdout)
