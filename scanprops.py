@@ -143,7 +143,7 @@ def runner(config_json: Path, max_batch_size: int, use_fp16: bool) -> dict[str, 
     return metrics
 
 
-def mlflow_run(expt_name: str, config_json: Path, max_batch_size: int, use_fp16: bool):
+def mlflow_run(expt_name: str, config_json: str, max_batch_size: int, use_fp16: bool):
     """Multiprocessing friendly wrapper to start an mlflow run"""
     expts = mlflow.search_experiments(filter_string=f"name = {expt_name!r}")
     if not expts:
@@ -155,7 +155,7 @@ def mlflow_run(expt_name: str, config_json: Path, max_batch_size: int, use_fp16:
 
     # FIXME: add git metadata in tags
     with mlflow.start_run(experiment_id=expt_id, tags={"branch": "ghostbuster"}):
-        return runner(config_json, max_batch_size, use_fp16)
+        return runner(Path(config_json), max_batch_size, use_fp16)
 
 
 if __name__ == "__main__":
@@ -169,7 +169,6 @@ if __name__ == "__main__":
     parser.add_argument("--batch-size-range", nargs=2, type=int)
     parser.add_argument("--fp16", action="store_true", help="Benchmark FP16 support")
     opts = parser.parse_args()
-    config_json = Path(opts.config_json)
     params = tuple(param_matrix(opts.batch_size_range, opts.fp16))
     njobs = len(params)
 
@@ -179,7 +178,7 @@ if __name__ == "__main__":
             executor.map(
                 mlflow_run,
                 repeat(opts.experiment_name, njobs),
-                repeat(config_json, njobs),
+                repeat(opts.config_json, njobs),
                 *zip(*params),
             ),
         ):
