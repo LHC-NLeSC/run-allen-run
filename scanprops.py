@@ -3,8 +3,7 @@
 
 """
 
-from concurrent.futures import ProcessPoolExecutor
-from itertools import product, repeat
+from itertools import product
 import json
 from math import log2
 from pathlib import Path
@@ -170,16 +169,7 @@ if __name__ == "__main__":
     parser.add_argument("--fp16", action="store_true", help="Benchmark FP16 support")
     opts = parser.parse_args()
     params = tuple(param_matrix(opts.batch_size_range, opts.fp16))
-    njobs = len(params)
 
-    with ProcessPoolExecutor(2) as executor:
-        for par, metric in zip(
-            params,
-            executor.map(
-                mlflow_run,
-                repeat(opts.experiment_name, njobs),
-                repeat(opts.config_json, njobs),
-                *zip(*params),
-            ),
-        ):
-            print(par, metric)
+    for batch, fp16 in param_matrix(opts.batch_size_range, opts.fp16):
+        par, metric = mlflow_run(opts.experiment_name, opts.config_json, batch, fp16)
+        print(par, metric)
