@@ -178,7 +178,7 @@ if __name__ == "__main__":
             params,
             executor.map(
                 mlflow_run,
-                repeat(opts.experiment_name),
+                repeat(opts.experiment_name, njobs),
                 repeat(config_json, njobs),
                 *zip(*params),
             ),
