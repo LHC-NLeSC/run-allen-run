@@ -173,8 +173,7 @@ if __name__ == "__main__":
     parser.add_argument("--batch-size-range", nargs=2, type=int)
     parser.add_argument("--fp16", action="store_true", help="Benchmark FP16 support")
     opts = parser.parse_args()
-    params = tuple(param_matrix(opts.batch_size_range, opts.fp16))
 
     for batch, fp16 in param_matrix(opts.batch_size_range, opts.fp16):
-        par, metric = mlflow_run(opts.experiment_name, opts.config_json, batch, fp16)
-        print(par, metric)
+        metric = mlflow_run(opts.experiment_name, opts.config_json, batch, fp16)
+        print(metric)
