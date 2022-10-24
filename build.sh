@@ -8,7 +8,13 @@ declare repo="$1" branch="$2"
 # tip=$(GIT_DIR="$repo/.git" git show-ref --hash=9 "refs/heads/$branch")
 # cdate=$(git log --date=short --format=%ad -1 "$branch")
 srcdir="Allen-${branch}"
-git clone "$repo" -b $branch --depth 20 "$srcdir"
+if [[ -d $srcdir/.git ]]; then
+    pushd $srcdir
+    git pull
+    popd
+else
+    git clone "$repo" -b $branch "$srcdir"
+fi
 
 declare threads=$(( $(grep --color=never -m1 'cpu cores' /proc/cpuinfo | sed -ne 's/.\+: \([0-9]\+\)/\1/p') / 2 ))
 builddir="$srcdir/build"
