@@ -6,7 +6,7 @@
 #PBS -l walltime=6:00:00
 #PBS -l mem=4gb
 
-pushd /project/bfys/suvayua/codebaby/run-allen-run || exit
+pushd /project/bfys/$USER/codebaby/run-allen-run || exit
 
 source lhcb-setup.sh
 source venv/bin/activate
