@@ -3,6 +3,7 @@
 
 """
 
+from dataclasses import asdict, dataclass
 from itertools import product
 import json
 from math import log2
@@ -75,6 +76,30 @@ def param_matrix(batch_size_range: tuple[int, int], fp16: bool):
     lo, hi = [round_up_2(i) for i in batch_size_range]
     batch_sizes = (1 << i for i in range(int(log2(lo)), int(log2(hi) + 1)))
     return product(batch_sizes, (True, False) if fp16 else (fp16,))
+
+
+@dataclass
+class Source:
+    branch: str
+    commit: str  # hash
+    date: str  # datetime
+    dirty: bool
+
+
+def git_commit() -> Source:
+    """Git commit metadata"""
+    # FIXME: include working directory dirty or not
+    branch = shtrip(sh.git.branch("--show-current"))
+    return Source(
+        branch=branch,
+        commit=shtrip(sh.git("show-ref", "--hash=9", f"refs/heads/{branch}")),
+        date=shtrip(
+            sh.git.log(
+                "--date=iso8601-strict", "--format=%ad", "-1", branch, _tty_out=False
+            )
+        ),
+        dirty=bool(sh.git("diff-index", "--shortstat", "HEAD")),
+    )
 
 
 def runner(config_json: Path, max_batch_size: int, use_fp16: bool) -> dict[str, float]:
@@ -157,9 +182,13 @@ def mlflow_run(expt_name: str, config_json: str, max_batch_size: int, use_fp16: 
     # causes race condition when using multiprocessing
     # expt_id = mlflow.create_experiment(expt_name)
 
-    # FIXME: add git metadata in tags
-    with mlflow.start_run(experiment_id=expt_id, tags={"branch": "ghostbuster"}):
-        return runner(Path(config_json), max_batch_size, use_fp16)
+    config_json_path = Path(config_json)
+    with sh.cd(config_json_path.parent):
+        tags = asdict(git_commit())
+        print(tags)
+
+    with mlflow.start_run(experiment_id=expt_id, tags=tags):
+        return runner(config_json_path, max_batch_size, use_fp16)
 
 
 if __name__ == "__main__":
