@@ -102,19 +102,18 @@ def git_commit() -> Source:
     )
 
 
-def runner(config_json: Path, max_batch_size: int, use_fp16: bool) -> dict[str, float]:
-    """Run Allen with the provided parameters, and log the metrics w/ mlflow
+def get_config(
+    config: dict, max_batch_size: int, use_fp16: bool
+) -> tuple[dict, str, dict]:
+    """Get config with new parameter values, and log them w/ mlflow
 
-    Log files are saved in the run directory:
-    - configuration: config-<parameters>.json
-    - stdout: stdout-<parameters>.log
-    - parameters & metrics: meta-<parameters>.json
+    Also encode the parameters in a string to be used in file names.
 
     Parameters
     ----------
-    config_json: Path
+    config: dict
 
-      Path to the JSON configuration to use as template
+      JSON configuration to use as template
 
     max_batch_size: int
 
@@ -126,22 +125,59 @@ def runner(config_json: Path, max_batch_size: int, use_fp16: bool) -> dict[str, 
 
     Returns
     -------
-    dict[str, float]
+    tuple[dict, str, dict]
 
-      Metrics: {"event_rate": 123.456, "duration": 123.456}
+      dict: full configuration, str: string encoded w/ parameter values, dict:
+      just the params
 
     """
     params = {"max_batch_size": max_batch_size, "use_fp16": use_fp16}
     mlflow.log_params(params)
     fname_part = f"batch-size-{max_batch_size}-fp16-{use_fp16}"
 
+    config["GhostProbabilityNN"]["max_batch_size"] = max_batch_size
+    config["GhostProbabilityNN"]["use_fp16"] = use_fp16
+    return (config, fname_part, params)
+
+
+def runner(
+    config_json: Path, config: dict, fname_part: str, params: dict
+) -> dict[str, float]:
+    """Run Allen with the configuration, and log the metrics w/ mlflow
+
+    Log files are saved in the run directory (logged as artifacts w/ mlflow):
+    - configuration: config-<parameters>.json
+    - stdout: stdout-<parameters>.log
+    - parameters & metrics: meta-<parameters>.json
+
+    Parameters
+    ----------
+    config_json: Path
+
+      Path to the template JSON configuration, used to determine run directory
+
+    config: dict
+
+      Allen job configuration
+
+    fname_part: str
+
+      Unique string to use in filenames
+
+    params: dict
+
+      Dict with parameter values, included in metadata log
+
+    Returns
+    -------
+    dict[str, float]
+
+      Metrics: {"event_rate": 123.456, "duration": 123.456}
+
+    """
     rundir = config_json.parent / Path(f"run-{fname_part}")
     rundir.mkdir(exist_ok=True)
     config_edited = rundir / f"config-{fname_part}.json"
-
-    config = json.loads(config_json.read_text())
-    config["GhostProbabilityNN"]["max_batch_size"] = max_batch_size
-    config["GhostProbabilityNN"]["use_fp16"] = use_fp16
     config_edited.write_text(json.dumps(config, indent=4))
 
     with sh.cd(rundir):
@@ -188,7 +224,13 @@ def mlflow_run(expt_name: str, config_json: str, max_batch_size: int, use_fp16: 
         print(tags)
 
     with mlflow.start_run(experiment_id=expt_id, tags=tags):
-        return runner(config_json_path, max_batch_size, use_fp16)
+        config = json.loads(config_json_path.read_text())
+        if tags["branch"] == "master":
+            fname_part = "master"
+            params = {}
+        else:
+            config, fname_part, params = get_config(config, max_batch_size, use_fp16)
+        return runner(config_json_path, config, fname_part, params)
 
 
 if __name__ == "__main__":
@@ -203,6 +245,11 @@ if __name__ == "__main__":
     parser.add_argument("--fp16", action="store_true", help="Benchmark FP16 support")
     opts = parser.parse_args()
 
-    for batch, fp16 in param_matrix(opts.batch_size_range, opts.fp16):
-        metric = mlflow_run(opts.experiment_name, opts.config_json, batch, fp16)
+    if opts.batch_size_range is None:
+        # dummy parameter values, they are ignored for master
+        metric = mlflow_run(opts.experiment_name, opts.config_json, -1, False)
         print(metric)
+    else:
+        for batch, fp16 in param_matrix(opts.batch_size_range, opts.fp16):
+            metric = mlflow_run(opts.experiment_name, opts.config_json, batch, fp16)
+            print(metric)
