@@ -1,5 +1,7 @@
 #!/bin/bash
 
+# set -o xtrace
+
 declare builddir="$1"
 pushd "$builddir"
 
@@ -11,7 +13,7 @@ declare branch=$(git branch --show-current) sequence
 	exit
     }
 
-if [[ branch == master ]]; then
+if [[ $branch == master ]]; then
     sequence=hlt1_pp_default
 else
     sequence=ghostbuster_test
