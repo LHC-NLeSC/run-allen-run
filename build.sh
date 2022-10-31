@@ -1,13 +1,18 @@
 #!/bin/bash
 
-declare ${TOOLCHAIN:=/cvmfs/lhcb.cern.ch/lib/lhcb/lcg-toolchains/LCG_101/x86_64-centos7-clang12+cuda11_4-opt.cmake}
+# set -o xtrace
+
+declare TOOLCHAIN
+if [[ ! -n $TOOLCHAIN ]]; then
+    TOOLCHAIN=/cvmfs/lhcb.cern.ch/lib/lhcb/lcg-toolchains/LCG_101/x86_64-centos7-clang12+cuda11_4-opt.cmake
+fi
 
 declare repo="$1" branch="$2"
 
 # # FIXME: make it work with remote repo
 # tip=$(GIT_DIR="$repo/.git" git show-ref --hash=9 "refs/heads/$branch")
 # cdate=$(git log --date=short --format=%ad -1 "$branch")
-srcdir="Allen-${branch}"
+srcdir="$(basename $repo)-${branch}"
 if [[ -d $srcdir/.git ]]; then
     pushd $srcdir
     git pull
