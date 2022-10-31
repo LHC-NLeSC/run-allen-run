@@ -30,6 +30,18 @@ application from the JSON configuration with the option
 The application accesses some files in the current directory, so this
 script separates the running directory for each run.
 
+The repo provides the scripts [`build.sh`](./build.sh) and
+[`prepare.sh`](./prepare.sh) that makes this process simpler.
+- `build.sh`: builds the specified branch from a local Allen
+  repository in a separate build directory parallel to the reference.
+  ```
+  $ ls -d Allen*
+  Allen  Allen-ghostbuster  Allen-master
+  ```
+- `prepare.sh`: writes out the JSON configuration such that the job
+  scripts [`scanprops.py`](./scanprops.py) and
+  [`submit-job.sh`](./submit-job.sh) can be run.
+
 ### Cleanup
 
 Deactivate the environment with
