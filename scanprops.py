@@ -225,8 +225,8 @@ def mlflow_run(expt_name: str, config_json: str, max_batch_size: int, use_fp16: 
 
     with mlflow.start_run(experiment_id=expt_id, tags=tags):
         config = json.loads(config_json_path.read_text())
-        if tags["branch"] == "master":
-            fname_part = "master"
+        if batch_size < 0:  # ghostbuster algorithm not included in sequence
+            fname_part = tags["branch"]
             params = {}
         else:
             config, fname_part, params = get_config(config, max_batch_size, use_fp16)
