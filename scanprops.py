@@ -179,13 +179,16 @@ def runner(
     rundir.mkdir(exist_ok=True)
     config_edited = rundir / f"config-{fname_part}.json"
     config_edited.write_text(json.dumps(config, indent=4))
+    sequence = config_edited.name
+    params.update(sequence=sequence)
+    mlflow.log_param("sequence", sequence)
 
     with sh.cd(rundir):
         env = ENV.copy()
         env["CUDA_VISIBLE_DEVICES"] = "0"
         cmd, opts = ALLEN_CMD
         stdout = shtrip(
-            sh.Command(cmd)(*opts.format(config=config_edited.name).split(), _env=env)
+            sh.Command(cmd)(*opts.format(config=sequence).split(), _env=env)
         )
         log_file = Path(f"stdout-{fname_part}.log")
         log_file.write_text(stdout)
