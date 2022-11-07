@@ -18,7 +18,7 @@ function write_seq_2_json() {
     ./toolchain/wrapper ./Allen -t 1 --events-per-slice 1000 -n 1000 -r 100 \
 			--write-configuration 1 --sequence $sequence \
 			--mdf /data/bfys/raaij/upgrade/MiniBrunel_2018_MinBias_FTv4_DIGI_retinacluster_v1.mdf
-    mv Sequence.json ${sequence}_seq.json
+    mv -v Sequence.json ${sequence}_seq.json
 }
 
 if [[ $branch == master ]]; then
