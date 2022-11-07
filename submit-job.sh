@@ -25,7 +25,8 @@ fi
 if [[ -d Allen-ghostbuster ]]; then
     python ./scanprops.py Allen-ghostbuster/build/ghostbuster_test_seq.json \
 	   --experiment-name v100 \
-	   --batch-size-range 256 16000
+	   --batch-size-range 256 16000 \
+	   --no-infer
     python ./scanprops.py Allen-ghostbuster/build/hlt1_pp_default_seq.json \
 	   --experiment-name v100
 else
