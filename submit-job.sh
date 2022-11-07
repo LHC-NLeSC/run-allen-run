@@ -15,7 +15,7 @@ mlflow experiments list 2>/dev/null | grep -q v100 || \
     mlflow experiments create -n v100
 
 if [[ -d Allen-master ]]; then
-    python ./scanprops.py Allen-master/build/Sequence.json \
+    python ./scanprops.py Allen-master/build/hlt1_pp_default_seq.json \
 	   --experiment-name v100
 else
     echo "Did you run ./build.sh?"
@@ -23,10 +23,10 @@ else
 fi
 
 if [[ -d Allen-ghostbuster ]]; then
-    python ./scanprops.py Allen-ghostbuster/build/Sequence.json \
+    python ./scanprops.py Allen-ghostbuster/build/ghostbuster_test_seq.json \
 	   --experiment-name v100 \
 	   --batch-size-range 256 16000
-    python ./scanprops.py Allen-ghostbuster/build \
+    python ./scanprops.py Allen-ghostbuster/build/hlt1_pp_default_seq.json \
 	   --experiment-name v100
 else
     echo "Did you run ./build.sh?"
