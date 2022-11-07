@@ -21,7 +21,7 @@ ALLEN_CMD = [
     "../toolchain/wrapper",
     "../Allen -g ../../input/detector_configuration/ "
     "-t 12 --events-per-slice 1000 -n 1000 -r 100 "
-    "--run-from-json 1 --sequence {config} "
+    "{flag} --sequence {sequence} "
     "--mdf /data/bfys/raaij/upgrade/MiniBrunel_2018_MinBias_FTv4_DIGI_retinacluster_v1.mdf",
 ]
 
@@ -175,17 +175,32 @@ def runner(
       Metrics: {"event_rate": 123.456, "duration": 123.456}
 
     """
-    rundir = config_json.parent / Path(f"run-{fname_part}")
+
+    if config_json.is_dir():
+        builddir = config_json
+    else:
+        builddir = config_json.parent
+    rundir = builddir / Path(f"run-{fname_part}")
     rundir.mkdir(exist_ok=True)
-    config_edited = rundir / f"config-{fname_part}.json"
-    config_edited.write_text(json.dumps(config, indent=4))
+
+    if config_json.is_dir():
+        run_from_json = ""
+        sequence = "hlt1_pp_default"
+    else:
+        run_from_json = "--run-from-json 1"
+        config_edited = rundir / f"config-{fname_part}.json"
+        config_edited.write_text(json.dumps(config, indent=4))
+        mlflow.log_artifact(f"{config_edited}")
+        sequence = config_edited.name
 
     with sh.cd(rundir):
         env = ENV.copy()
         env["CUDA_VISIBLE_DEVICES"] = "0"
         cmd, opts = ALLEN_CMD
         stdout = shtrip(
-            sh.Command(cmd)(*opts.format(config=config_edited.name).split(), _env=env)
+            sh.Command(cmd)(
+                *opts.format(flag=run_from_json, sequence=sequence).split(), _env=env
+            )
         )
         log_file = Path(f"stdout-{fname_part}.log")
         log_file.write_text(stdout)
@@ -199,16 +214,18 @@ def runner(
             event_rate, duration = -1.0, -1.0
         metrics = {"event_rate": event_rate, "duration": duration}
         meta_file = Path(f"meta-{fname_part}.json")
-        meta_file.write_text(json.dumps({**params, **metrics}, indent=2))
+        meta_file.write_text(
+            json.dumps({"sequence": sequence, **params, **metrics}, indent=2)
+        )
 
     mlflow.log_metrics(metrics)
-    mlflow.log_artifact(f"{config_edited}")
+    mlflow.log_param("sequence", sequence)
     mlflow.log_artifact(f"{rundir/log_file}")
     mlflow.log_artifact(f"{rundir/meta_file}")
     return metrics
 
 
-def mlflow_run(expt_name: str, config_json: str, max_batch_size: int, use_fp16: bool):
+def mlflow_run(expt_name: str, json_or_builddir: str, batch_size: int, use_fp16: bool):
     """Multiprocessing friendly wrapper to start an mlflow run"""
     expts = mlflow.search_experiments(filter_string=f"name = {expt_name!r}")
     if not expts:
@@ -218,19 +235,25 @@ def mlflow_run(expt_name: str, config_json: str, max_batch_size: int, use_fp16: 
     # causes race condition when using multiprocessing
     # expt_id = mlflow.create_experiment(expt_name)
 
-    config_json_path = Path(config_json)
-    with sh.cd(config_json_path.parent):
+    path = Path(json_or_builddir)
+    if path.is_dir():
+        builddir = path
+        config = {}
+    else:
+        builddir = path.parent
+        config = json.loads(path.read_text())
+
+    with sh.cd(builddir):
         tags = asdict(git_commit())
         print(tags)
 
     with mlflow.start_run(experiment_id=expt_id, tags=tags):
-        config = json.loads(config_json_path.read_text())
-        if tags["branch"] == "master":
-            fname_part = "master"
+        if batch_size < 0:  # ghostbuster algorithm not included in sequence
+            fname_part = tags["branch"]
             params = {}
         else:
-            config, fname_part, params = get_config(config, max_batch_size, use_fp16)
-        return runner(config_json_path, config, fname_part, params)
+            config, fname_part, params = get_config(config, batch_size, use_fp16)
+        return runner(path, config, fname_part, params)
 
 
 if __name__ == "__main__":
@@ -238,7 +261,8 @@ if __name__ == "__main__":
 
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
-        "config_json", help="Config JSON, parent directory should have the binary"
+        "config_json",
+        help="Config JSON/build dir, if JSON, it should be in the build dir",
     )
     parser.add_argument("--experiment-name", required=True)
     parser.add_argument("--batch-size-range", nargs=2, type=int)
@@ -246,7 +270,7 @@ if __name__ == "__main__":
     opts = parser.parse_args()
 
     if opts.batch_size_range is None:
-        # dummy parameter values, they are ignored for master
+        # dummy parameter values, irrelevant for baseline
         metric = mlflow_run(opts.experiment_name, opts.config_json, -1, False)
         print(metric)
     else:
