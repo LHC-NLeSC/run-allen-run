@@ -26,6 +26,8 @@ if [[ -d Allen-ghostbuster ]]; then
     python ./scanprops.py Allen-ghostbuster/build/Sequence.json \
 	   --experiment-name v100 \
 	   --batch-size-range 256 16000
+    python ./scanprops.py Allen-ghostbuster/build \
+	   --experiment-name v100
 else
     echo "Did you run ./build.sh?"
     echo "No build of ghostbuster branch found" > /dev/stderr
