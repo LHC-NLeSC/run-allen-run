@@ -53,8 +53,8 @@ def round_up_2(val: int) -> int:
     return val
 
 
-def param_matrix(batch_size_range: tuple[int, int], fp16: bool):
-    """Create all permutations from a range of batch sizes, and fp16
+def param_matrix(batch_size_range: tuple[int, int], no_infer: bool):
+    """Create all permutations from a range of batch sizes, and no infer
 
     Parameters
     ----------
@@ -63,10 +63,9 @@ def param_matrix(batch_size_range: tuple[int, int], fp16: bool):
       The range limits are rounded up to the nearest power of 2, and then
       intermediate powers of two are filled in.
 
-    fp16: bool
+    no_infer: bool
 
-      If True, permutation also includes fp16 support set to True or False, it
-      is set to False otherwise
+      If True, permutation also includes a run without any inference
 
     Returns
     -------
@@ -75,7 +74,7 @@ def param_matrix(batch_size_range: tuple[int, int], fp16: bool):
     """
     lo, hi = [round_up_2(i) for i in batch_size_range]
     batch_sizes = (1 << i for i in range(int(log2(lo)), int(log2(hi) + 1)))
-    return product(batch_sizes, (True, False) if fp16 else (fp16,))
+    return product(batch_sizes, (True, False) if no_infer else (False,))
 
 
 @dataclass
@@ -103,7 +102,7 @@ def git_commit() -> Source:
 
 
 def get_config(
-    config: dict, max_batch_size: int, use_fp16: bool
+    config: dict, max_batch_size: int, no_infer: bool
 ) -> tuple[dict, str, dict]:
     """Get config with new parameter values, and log them w/ mlflow
 
@@ -119,9 +118,9 @@ def get_config(
 
       Maximum batch size for our algorithm ("GhostProbabilityNN")
 
-    use_fp16: bool
+    no_infer: bool
 
-      Whether to enable FP16 optimisation
+      Whether disable to inference for benchmarking
 
     Returns
     -------
@@ -131,12 +130,12 @@ def get_config(
       just the params
 
     """
-    params = {"max_batch_size": max_batch_size, "use_fp16": use_fp16}
+    params = {"max_batch_size": max_batch_size, "no_infer": no_infer}
     mlflow.log_params(params)
-    fname_part = f"batch-size-{max_batch_size}-fp16-{use_fp16}"
+    fname_part = f"batch-size-{max_batch_size}-no-infer-{no_infer}"
 
     config["GhostProbabilityNN"]["max_batch_size"] = max_batch_size
-    config["GhostProbabilityNN"]["use_fp16"] = use_fp16
+    config["GhostProbabilityNN"]["no_infer"] = no_infer
     return (config, fname_part, params)
 
 
@@ -211,7 +210,7 @@ def runner(
     return metrics
 
 
-def mlflow_run(expt_name: str, config_json: str, max_batch_size: int, use_fp16: bool):
+def mlflow_run(expt_name: str, config_json: str, batch_size: int, no_infer: bool):
     """Multiprocessing friendly wrapper to start an mlflow run"""
     expts = mlflow.search_experiments(filter_string=f"name = {expt_name!r}")
     if not expts:
@@ -232,7 +231,7 @@ def mlflow_run(expt_name: str, config_json: str, max_batch_size: int, use_fp16: 
             fname_part = tags["branch"]
             params = {}
         else:
-            config, fname_part, params = get_config(config, max_batch_size, use_fp16)
+            config, fname_part, params = get_config(config, batch_size, no_infer)
         return runner(config_json_path, config, fname_part, params)
 
 
@@ -245,7 +244,7 @@ if __name__ == "__main__":
     )
     parser.add_argument("--experiment-name", required=True)
     parser.add_argument("--batch-size-range", nargs=2, type=int)
-    parser.add_argument("--fp16", action="store_true", help="Benchmark FP16 support")
+    parser.add_argument("--no-infer", action="store_true", help="Turn inference off")
     opts = parser.parse_args()
 
     if opts.batch_size_range is None:
@@ -253,6 +252,6 @@ if __name__ == "__main__":
         metric = mlflow_run(opts.experiment_name, opts.config_json, -1, False)
         print(metric)
     else:
-        for batch, fp16 in param_matrix(opts.batch_size_range, opts.fp16):
-            metric = mlflow_run(opts.experiment_name, opts.config_json, batch, fp16)
+        for batch, no_infer in param_matrix(opts.batch_size_range, opts.no_infer):
+            metric = mlflow_run(opts.experiment_name, opts.config_json, batch, no_infer)
             print(metric)
