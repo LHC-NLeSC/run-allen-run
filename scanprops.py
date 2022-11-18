@@ -53,8 +53,8 @@ def round_up_2(val: int) -> int:
     return val
 
 
-def param_matrix(batch_size_range: tuple[int, int], no_infer: bool):
-    """Create all permutations from a range of batch sizes, and no infer
+def param_matrix(batch_size_range: tuple[int, int], no_infer: bool, fp16: bool):
+    """Create all permutations from a range of batch sizes, no infer, and use fp16
 
     Parameters
     ----------
@@ -67,6 +67,11 @@ def param_matrix(batch_size_range: tuple[int, int], no_infer: bool):
 
       If True, permutation also includes a run without any inference
 
+    fp16: bool
+
+      If True, permutation also includes fp16 support set to True or False, it
+      is set to False otherwise
+
     Returns
     -------
     product[tuple[int, bool]]
@@ -74,7 +79,11 @@ def param_matrix(batch_size_range: tuple[int, int], no_infer: bool):
     """
     lo, hi = [round_up_2(i) for i in batch_size_range]
     batch_sizes = (1 << i for i in range(int(log2(lo)), int(log2(hi) + 1)))
-    return product(batch_sizes, (True, False) if no_infer else (False,))
+    return product(
+        batch_sizes,
+        (True, False) if no_infer else (False,),
+        (True, False) if fp16 else (False,),
+    )
 
 
 @dataclass
@@ -101,9 +110,17 @@ def git_commit() -> Source:
     )
 
 
-def get_config(
-    config: dict, max_batch_size: int, no_infer: bool
-) -> tuple[dict, str, dict]:
+@dataclass
+class jobopts_t:
+    batch_size: int
+    onnx_input: str
+    input_name: str
+    no_infer: bool = False
+    copies: int = 1
+    use_fp16: bool = False
+
+
+def get_config(config: dict, opts: jobopts_t) -> tuple[dict, str, dict]:
     """Get config with new parameter values, and log them w/ mlflow
 
     Also encode the parameters in a string to be used in file names.
@@ -114,13 +131,12 @@ def get_config(
 
       JSON configuration to use as template
 
-    max_batch_size: int
+    opts: jobopts_t
 
-      Maximum batch size for our algorithm ("GhostProbabilityNN")
-
-    no_infer: bool
-
-      Whether disable to inference for benchmarking
+      Job options: only the following attributes are used
+      - batch_size: maximum batch size for our algorithm ("GhostProbabilityNN")
+      - no_infer: whether to disable inference for benchmarking
+      - use_fp16: whether to enable FP16 optimisation
 
     Returns
     -------
@@ -130,12 +146,24 @@ def get_config(
       just the params
 
     """
-    params = {"max_batch_size": max_batch_size, "no_infer": no_infer}
+    max_batch_size = opts.batch_size
+    no_infer = opts.no_infer
+    use_fp16 = opts.use_fp16
+    onnx_input = Path(opts.onnx_input)
+    params = {
+        "max_batch_size": max_batch_size,
+        "no_infer": no_infer,
+        "use_fp16": use_fp16,
+        "onnx_input": onnx_input.stem,
+    }
     mlflow.log_params(params)
-    fname_part = f"batch-size-{max_batch_size}-no-infer-{no_infer}"
+    fname_part = f"batch-size-{max_batch_size}-no-infer-{no_infer}-fp16-{use_fp16}-onnx-{onnx_input.stem}"
 
     config["GhostProbabilityNN"]["max_batch_size"] = max_batch_size
     config["GhostProbabilityNN"]["no_infer"] = no_infer
+    config["GhostProbabilityNN"]["use_fp16"] = use_fp16
+    config["GhostProbabilityNN"]["onnx_input"] = str(onnx_input)
+    config["GhostProbabilityNN"]["input_name"] = opts.input_name
     return (config, fname_part, params)
 
 
@@ -179,7 +207,7 @@ def runner(
     config_edited = rundir / f"config-{fname_part}.json"
     config_edited.write_text(json.dumps(config, indent=4))
 
-    sequence = config_json.name
+    sequence = config_json.stem
     params.update(sequence=sequence)
     mlflow.log_param("sequence", sequence)
 
@@ -211,7 +239,7 @@ def runner(
     return metrics
 
 
-def mlflow_run(expt_name: str, config_json: str, batch_size: int, no_infer: bool):
+def mlflow_run(expt_name: str, config_json: str, opts: jobopts_t):
     """Multiprocessing friendly wrapper to start an mlflow run"""
     expts = mlflow.search_experiments(filter_string=f"name = {expt_name!r}")
     if not expts:
@@ -228,11 +256,11 @@ def mlflow_run(expt_name: str, config_json: str, batch_size: int, no_infer: bool
 
     with mlflow.start_run(experiment_id=expt_id, tags=tags):
         config = json.loads(config_json_path.read_text())
-        if batch_size < 0:  # ghostbuster algorithm not included in sequence
+        if opts.batch_size < 0:  # ghostbuster algorithm not included in sequence
             fname_part = tags["branch"]
             params = {}
         else:
-            config, fname_part, params = get_config(config, batch_size, no_infer)
+            config, fname_part, params = get_config(config, opts)
         return runner(config_json_path, config, fname_part, params)
 
 
@@ -243,16 +271,37 @@ if __name__ == "__main__":
     parser.add_argument(
         "config_json", help="Config JSON, parent directory should have the binary"
     )
+    parser.add_argument("--input-name", required=True)
     parser.add_argument("--experiment-name", required=True)
     parser.add_argument("--batch-size-range", nargs=2, type=int)
-    parser.add_argument("--no-infer", action="store_true", help="Turn inference off")
+    parser.add_argument("--no-infer", action="store_true", help="Toggle inference")
+    parser.add_argument("--fp16", action="store_true", help="Benchmark FP16 support")
+    parser.add_argument(
+        "--onnx-input",
+        default="/project/bfys/suvayua/codebaby/Allen/input/ghost_nn.onnx",
+        help="Path to ONNX file that should be used for inference",
+    )
+
     opts = parser.parse_args()
+    jobopts = jobopts_t(
+        batch_size=-1,  # dummy
+        no_infer=opts.infer,
+        use_fp16=opts.fp16,
+        onnx_input=opts.onnx_input,
+        input_name=opts.input_name,
+    )
 
     if opts.batch_size_range is None:
-        # dummy parameter values, they are ignored for master
-        metric = mlflow_run(opts.experiment_name, opts.config_json, -1, False)
+        # dummy parameter values, they are ignored when ghostbuster isn't included
+        jobopts.batch_size = -1
+        metric = mlflow_run(opts.experiment_name, opts.config_json, jobopts)
         print(metric)
     else:
-        for batch, no_infer in param_matrix(opts.batch_size_range, opts.no_infer):
-            metric = mlflow_run(opts.experiment_name, opts.config_json, batch, no_infer)
+        for batch, no_infer, fp16 in param_matrix(
+            opts.batch_size_range, opts.no_infer, opts.fp16
+        ):
+            jobopts.batch_size = batch
+            jobopts.no_infer = no_infer
+            jobopts.use_fp16 = fp16
+            metric = mlflow_run(opts.experiment_name, opts.config_json, jobopts)
             print(metric)
