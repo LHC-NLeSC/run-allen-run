@@ -112,12 +112,12 @@ def git_commit() -> Source:
 
 @dataclass
 class jobopts_t:
-    batch_size: int
+    max_batch_size: int
     onnx_input: str
     input_name: str
     no_infer: bool = False
-    copies: int = 1
     use_fp16: bool = False
+    copies: int = 1
 
 
 def get_config(config: dict, opts: jobopts_t) -> tuple[dict, str, dict]:
@@ -146,24 +146,17 @@ def get_config(config: dict, opts: jobopts_t) -> tuple[dict, str, dict]:
       just the params
 
     """
-    max_batch_size = opts.batch_size
-    no_infer = opts.no_infer
-    use_fp16 = opts.use_fp16
     onnx_input = Path(opts.onnx_input)
-    params = {
-        "max_batch_size": max_batch_size,
-        "no_infer": no_infer,
-        "use_fp16": use_fp16,
-        "onnx_input": onnx_input.stem,
-    }
+    params = asdict(opts)
     mlflow.log_params(params)
-    fname_part = f"batch-size-{max_batch_size}-no-infer-{no_infer}-fp16-{use_fp16}-onnx-{onnx_input.stem}"
 
-    config["GhostProbabilityNN"]["max_batch_size"] = max_batch_size
-    config["GhostProbabilityNN"]["no_infer"] = no_infer
-    config["GhostProbabilityNN"]["use_fp16"] = use_fp16
-    config["GhostProbabilityNN"]["onnx_input"] = str(onnx_input)
-    config["GhostProbabilityNN"]["input_name"] = opts.input_name
+    fname_part = "batch-size-{max_batch_size}-"
+    fname_part += "no-infer-{no_infer}-"
+    fname_part += "fp16-{use_fp16}-"
+    fname_part += "onnx-{onnx_input}"
+    fname_part.format(**{**params, "onnx_input": onnx_input.stem})
+
+    config["GhostProbabilityNN"].update((k, v) for k, v in params if k != "copies")
     return (config, fname_part, params)
 
 
@@ -256,7 +249,7 @@ def mlflow_run(expt_name: str, config_json: str, opts: jobopts_t):
 
     with mlflow.start_run(experiment_id=expt_id, tags=tags):
         config = json.loads(config_json_path.read_text())
-        if opts.batch_size < 0:  # ghostbuster algorithm not included in sequence
+        if opts.max_batch_size < 0:  # ghostbuster algorithm not included in sequence
             fname_part = tags["branch"]
             params = {}
         else:
@@ -284,7 +277,7 @@ if __name__ == "__main__":
 
     opts = parser.parse_args()
     jobopts = jobopts_t(
-        batch_size=-1,  # dummy
+        max_batch_size=-1,  # dummy
         no_infer=opts.infer,
         use_fp16=opts.fp16,
         onnx_input=opts.onnx_input,
@@ -293,14 +286,14 @@ if __name__ == "__main__":
 
     if opts.batch_size_range is None:
         # dummy parameter values, they are ignored when ghostbuster isn't included
-        jobopts.batch_size = -1
+        jobopts.max_batch_size = -1
         metric = mlflow_run(opts.experiment_name, opts.config_json, jobopts)
         print(metric)
     else:
         for batch, no_infer, fp16 in param_matrix(
             opts.batch_size_range, opts.no_infer, opts.fp16
         ):
-            jobopts.batch_size = batch
+            jobopts.max_batch_size = batch
             jobopts.no_infer = no_infer
             jobopts.use_fp16 = fp16
             metric = mlflow_run(opts.experiment_name, opts.config_json, jobopts)
