@@ -13,6 +13,7 @@ import re
 from typing import Union
 
 import mlflow
+import onnx
 import sh
 
 TEST_CMD = ["../foo.sh", "42 {config} --foo bar"]
@@ -257,6 +258,10 @@ def mlflow_run(expt_name: str, config_json: str, opts: jobopts_t):
         return runner(config_json_path, config, fname_part, params)
 
 
+def onnx_input_name(onnx_input: str):
+    return onnx.load(onnx_input).graph.input[0].name
+
+
 if __name__ == "__main__":
     import argparse
 
@@ -264,7 +269,6 @@ if __name__ == "__main__":
     parser.add_argument(
         "config_json", help="Config JSON, parent directory should have the binary"
     )
-    parser.add_argument("--input-name", required=True)
     parser.add_argument("--experiment-name", required=True)
     parser.add_argument("--batch-size-range", nargs=2, type=int)
     parser.add_argument("--no-infer", action="store_true", help="Toggle inference")
@@ -281,7 +285,7 @@ if __name__ == "__main__":
         no_infer=opts.infer,
         use_fp16=opts.fp16,
         onnx_input=opts.onnx_input,
-        input_name=opts.input_name,
+        input_name=onnx_input_name(opts.onnx_input),
     )
 
     if opts.batch_size_range is None:
