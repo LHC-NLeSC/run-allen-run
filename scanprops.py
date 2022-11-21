@@ -189,15 +189,14 @@ def get_config(config: dict, opts: jobopts_t) -> dict:
 
 def edit_options(src: str, opts: jobopts_t) -> str:
     mlflow.log_params(asdict(opts))
-    tree = ast.parse(Path(src).read_text(), filename=src)
-    not_props = ["copies"]
+    tree = ast.parse(src)
     # contextmanager
     with_block, *_ = [node for node in tree.body if isinstance(node, ast.With)]
     with_item, *_ = with_block.items
     with_item.context_expr.keywords = [
         ast.keyword(prop, ast.Constant(getattr(opts, prop)))
         for prop in asdict(opts)
-        if prop not in not_props
+        if prop not in opts.not_props
     ]
 
     # line 1: ghostbuster copies
@@ -313,27 +312,29 @@ def mlflow_run(expt_name: str, path: str, opts: jobopts_t):
     # expt_id = mlflow.create_experiment(expt_name)
 
     _path = Path(path)
-    if _path.is_dir():
-        rundir = _path
-        if opts.max_batch_size < 0:  # ghostbuster algorithm not included in sequence
-            config_edited = (
-                git_root() / f"configuration/python/AllenSequences/hlt1_pp_default.py"
-            )
-        else:
-            config_edited = write_config_py(rundir, "ghostbuster_test", opts)
-    else:
-        rundir = _path.parent
-        if opts.max_batch_size < 0:  # ghostbuster algorithm not included in sequence
-            config_edited = _path
-        else:
-            config = json.loads(_path.read_text())
-            config_edited = write_config_json(rundir, get_config(config, opts), opts)
+    rundir = _path if _path.is_dir() else _path.parent
 
     with sh.cd(rundir):
         tags = asdict(git_commit())
         print(tags)
 
     with mlflow.start_run(experiment_id=expt_id, tags=tags):
+        if opts.max_batch_size < 0:  # ghostbuster algorithm not included in sequence
+            if _path.is_dir():
+                config_edited = (
+                    git_root()
+                    / f"configuration/python/AllenSequences/hlt1_pp_default.py"
+                )
+            else:
+                config_edited = _path
+        else:
+            if _path.is_dir():
+                config_edited = write_config_py(rundir, "ghostbuster_test", opts)
+            else:
+                config = json.loads(_path.read_text())
+                config_edited = write_config_json(
+                    rundir, get_config(config, opts), opts
+                )
         return runner(rundir, config_edited, opts)
 
 
