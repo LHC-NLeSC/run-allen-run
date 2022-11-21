@@ -23,10 +23,18 @@ else
 fi
 
 if [[ -d Allen-ghostbuster ]]; then
-    python ./scanprops.py Allen-ghostbuster/build/ghostbuster_test_seq.json \
-	   --experiment-name v100 \
-	   --batch-size-range 256 16000 \
-	   --no-infer
+    for i in {1..4};
+    do
+	for f in nn nn_big;
+	do
+	    python ./scanprops.py Allen-ghostbuster/build/ \
+		   --experiment-name v100 \
+		   --batch-size-range 256 16000 \
+		   --no-infer \
+		   --onnx-input /project/bfys/suvayua/codebaby/Allen/input/ghost_${f}.onnx \
+		   --copies $i
+	done
+    done
     python ./scanprops.py Allen-ghostbuster/build/hlt1_pp_default_seq.json \
 	   --experiment-name v100
 else
