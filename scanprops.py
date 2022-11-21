@@ -361,7 +361,7 @@ if __name__ == "__main__":
     opts = parser.parse_args()
     jobopts = jobopts_t(
         max_batch_size=-1,  # dummy
-        no_infer=opts.infer,
+        no_infer=opts.no_infer,
         use_fp16=opts.fp16,
         onnx_input=opts.onnx_input,
         input_name=onnx_input_name(opts.onnx_input),
