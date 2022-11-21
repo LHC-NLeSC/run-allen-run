@@ -188,14 +188,14 @@ def get_config(config: dict, opts: jobopts_t) -> dict:
 
 
 def edit_options(src: str, opts: jobopts_t) -> str:
-    mlflow.log_params(asdict(opts))
+    params = asdict(opts)
     tree = ast.parse(src)
     # contextmanager
     with_block, *_ = [node for node in tree.body if isinstance(node, ast.With)]
     with_item, *_ = with_block.items
     with_item.context_expr.keywords = [
         ast.keyword(prop, ast.Constant(getattr(opts, prop)))
-        for prop in asdict(opts)
+        for prop in params
         if prop not in opts.not_props
     ]
 
@@ -205,13 +205,13 @@ def edit_options(src: str, opts: jobopts_t) -> str:
         ast.keyword("with_ghostbuster", ast.Constant(True)),
         ast.keyword("ghostbuster_copies", ast.Constant(opts.copies)),
     ]
+    mlflow.log_params(params)
     return ast.unparse(tree)
 
 
 def write_config_py(rundir: Path, sequence: str, opts: jobopts_t):
     with sh.cd(rundir):
-        topdir = git_root()
-        pyconfig = topdir / f"configuration/python/AllenSequences/{sequence}.py"
+        pyconfig = git_root() / f"configuration/python/AllenSequences/{sequence}.py"
         config = edit_options(pyconfig.read_text(), opts)
         pyconfig_edited = pyconfig.with_stem(f"{sequence}_edited")
         pyconfig_edited.write_text(config)
