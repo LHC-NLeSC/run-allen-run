@@ -32,12 +32,15 @@ script separates the running directory for each run.
 
 The repo provides the scripts [`build.sh`](./build.sh) and
 [`prepare.sh`](./prepare.sh) that makes this process simpler.
-- `build.sh`: builds the specified branch from a local Allen
-  repository in a separate build directory parallel to the reference.
+
+- `build.sh`: checks out and builds the specified branch from a local
+  Allen repository in a separate directory under the current
+  directory.
   ```
   $ ls -d Allen*
-  Allen  Allen-ghostbuster  Allen-master
+  Allen-ghostbuster  Allen-master
   ```
+
 - `prepare.sh`: writes out the JSON configuration such that the job
   scripts [`scanprops.py`](./scanprops.py) and
   [`submit-job.sh`](./submit-job.sh) can be run.
