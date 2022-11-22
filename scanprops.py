@@ -308,9 +308,6 @@ if __name__ == "__main__":
         default="/project/bfys/suvayua/codebaby/Allen/input/ghost_nn.onnx",
         help="Path to ONNX file that should be used for inference",
     )
-    parser.add_argument(
-        "--copies", type=int, default=1, help="Number of algo instances"
-    )
 
     opts = parser.parse_args()
     jobopts = jobopts_t(
@@ -319,7 +316,7 @@ if __name__ == "__main__":
         use_fp16=opts.fp16,
         onnx_input=opts.onnx_input,
         input_name=onnx_input_name(opts.onnx_input),
-        copies=opts.copies,
+        copies=1,
     )
 
     if opts.batch_size_range is None:
