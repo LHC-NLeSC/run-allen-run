@@ -145,8 +145,7 @@ class jobopts_t:
         fname_part += "no-infer-{no_infer}-"
         fname_part += "fp16-{use_fp16}-"
         fname_part += "onnx-{onnx_input}"
-        fname_part.format(**params)
-        return fname_part
+        return fname_part.format(**params)
 
 
 def onnx_input_name(onnx_input: str):
@@ -182,13 +181,15 @@ def get_config(config: dict, opts: jobopts_t) -> dict:
     params = asdict(opts)
     mlflow.log_params(params)
     config["GhostProbabilityNN0"].update(
-        (k, v) for k, v in params if k not in opts.not_props
+        (k, v) for k, v in params.items() if k not in opts.not_props
     )
     return config
 
 
 def edit_options(src: str, opts: jobopts_t) -> str:
     params = asdict(opts)
+    mlflow.log_params(params)
+
     tree = ast.parse(src)
     # contextmanager
     with_block, *_ = [node for node in tree.body if isinstance(node, ast.With)]
@@ -205,26 +206,27 @@ def edit_options(src: str, opts: jobopts_t) -> str:
         ast.keyword("with_ghostbuster", ast.Constant(True)),
         ast.keyword("ghostbuster_copies", ast.Constant(opts.copies)),
     ]
-    mlflow.log_params(params)
     return ast.unparse(tree)
 
 
-def write_config_py(rundir: Path, sequence: str, opts: jobopts_t):
-    with sh.cd(rundir):
+def write_config_py(builddir: Path, sequence: str, opts: jobopts_t):
+    with sh.cd(builddir):
         pyconfig = git_root() / f"configuration/python/AllenSequences/{sequence}.py"
         config = edit_options(pyconfig.read_text(), opts)
         pyconfig_edited = pyconfig.with_stem(f"{sequence}_edited")
         pyconfig_edited.write_text(config)
-        return pyconfig_edited
+    rundir = builddir / Path(f"run-{opts.fname_part}")
+    rundir.mkdir(exist_ok=True)
+    return rundir, pyconfig_edited
 
 
-def write_config_json(rundir: Path, config: dict, opts: jobopts_t):
+def write_config_json(builddir: Path, config: dict, opts: jobopts_t):
     config = get_config(config, opts)
-    rundir = rundir / Path(f"run-{opts.fname_part}")
+    rundir = builddir / Path(f"run-{opts.fname_part}")
     rundir.mkdir(exist_ok=True)
     config_edited = rundir / f"config-{opts.fname_part}.json"
     config_edited.write_text(json.dumps(config, indent=4))
-    return config_edited
+    return rundir, config_edited
 
 
 def runner(rundir: Path, config_edited: Path, jobopts: jobopts_t) -> dict[str, float]:
@@ -256,11 +258,11 @@ def runner(rundir: Path, config_edited: Path, jobopts: jobopts_t) -> dict[str, f
     """
     if config_edited.suffix == ".json":
         flag = JSON_FLAG
-        sequence = config_edited
-        mlflow.log_param("sequence", sequence.name)
+        sequence = config_edited.relative_to(rundir)
+        mlflow.log_param("sequence", sequence.stem)
     else:
         flag = ""
-        sequence = config_edited.name
+        sequence = config_edited.stem
         mlflow.log_param("sequence", sequence)
 
     if mlflow_if_master():
@@ -269,7 +271,7 @@ def runner(rundir: Path, config_edited: Path, jobopts: jobopts_t) -> dict[str, f
         fname_part = jobopts.fname_part
 
     params = asdict(jobopts)
-    params.update(sequence=sequence)
+    params.update(sequence=str(sequence))
 
     with sh.cd(rundir):
         env = ENV.copy()
@@ -312,9 +314,9 @@ def mlflow_run(expt_name: str, path: str, opts: jobopts_t):
     # expt_id = mlflow.create_experiment(expt_name)
 
     _path = Path(path)
-    rundir = _path if _path.is_dir() else _path.parent
+    builddir = _path if _path.is_dir() else _path.parent
 
-    with sh.cd(rundir):
+    with sh.cd(builddir):
         tags = asdict(git_commit())
         print(tags)
 
@@ -323,18 +325,18 @@ def mlflow_run(expt_name: str, path: str, opts: jobopts_t):
             if _path.is_dir():
                 config_edited = (
                     git_root()
-                    / f"configuration/python/AllenSequences/hlt1_pp_default.py"
+                    / "configuration/python/AllenSequences/hlt1_pp_default.py"
                 )
             else:
                 config_edited = _path
         else:
             if _path.is_dir():
-                config_edited = write_config_py(rundir, "ghostbuster_test", opts)
+                rundir, config_edited = write_config_py(
+                    builddir, "ghostbuster_test", opts
+                )
             else:
                 config = json.loads(_path.read_text())
-                config_edited = write_config_json(
-                    rundir, get_config(config, opts), opts
-                )
+                rundir, config_edited = write_config_json(builddir, config, opts)
         return runner(rundir, config_edited, opts)
 
 
