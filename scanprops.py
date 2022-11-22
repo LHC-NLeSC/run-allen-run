@@ -3,7 +3,6 @@
 
 """
 
-import ast
 from dataclasses import asdict, dataclass
 from itertools import product
 import json
@@ -117,10 +116,10 @@ def git_root() -> Path:
     return Path(shtrip(sh.git("rev-parse", "--show-toplevel")))
 
 
-def mlflow_if_master() -> bool:
+def mlflow_src_branch() -> str:
     run = mlflow.active_run()
     assert run is not None, "runner: no active run, something went wrong"
-    return run.data.tags["branch"] == "master"
+    return run.data.tags["branch"]
 
 
 @dataclass
@@ -186,45 +185,16 @@ def get_config(config: dict, opts: jobopts_t) -> dict:
     return config
 
 
-def edit_options(src: str, opts: jobopts_t) -> str:
-    params = asdict(opts)
-    mlflow.log_params(params)
-
-    tree = ast.parse(src)
-    # contextmanager
-    with_block, *_ = [node for node in tree.body if isinstance(node, ast.With)]
-    with_item, *_ = with_block.items
-    with_item.context_expr.keywords = [
-        ast.keyword(prop, ast.Constant(getattr(opts, prop)))
-        for prop in params
-        if prop not in opts.not_props
-    ]
-
-    # line 1: ghostbuster copies
-    seq_assign, *_ = [node for node in with_block.body if isinstance(node, ast.Assign)]
-    seq_assign.value.keywords = [
-        ast.keyword("with_ghostbuster", ast.Constant(True)),
-        ast.keyword("ghostbuster_copies", ast.Constant(opts.copies)),
-    ]
-    return ast.unparse(tree)
-
-
-def write_config_py(builddir: Path, sequence: str, opts: jobopts_t):
-    with sh.cd(builddir):
-        pyconfig = git_root() / f"configuration/python/AllenSequences/{sequence}.py"
-        config = edit_options(pyconfig.read_text(), opts)
-        pyconfig_edited = pyconfig.with_stem(f"{sequence}_edited")
-        pyconfig_edited.write_text(config)
-    rundir = builddir / Path(f"run-{opts.fname_part}")
-    rundir.mkdir(exist_ok=True)
-    return rundir, pyconfig_edited
-
-
 def write_config_json(builddir: Path, config: dict, opts: jobopts_t):
-    config = get_config(config, opts)
-    rundir = builddir / Path(f"run-{opts.fname_part}")
+    if opts.max_batch_size < 0:  # ghostbuster algorithm not included in sequence
+        fname_part = mlflow_src_branch()
+    else:
+        fname_part = opts.fname_part
+        config = get_config(config, opts)
+
+    rundir = builddir / Path(f"run-{fname_part}")
     rundir.mkdir(exist_ok=True)
-    config_edited = rundir / f"config-{opts.fname_part}.json"
+    config_edited = rundir / f"config-{fname_part}.json"
     config_edited.write_text(json.dumps(config, indent=4))
     return rundir, config_edited
 
@@ -256,19 +226,14 @@ def runner(rundir: Path, config_edited: Path, jobopts: jobopts_t) -> dict[str, f
       Metrics: {"event_rate": 123.456, "duration": 123.456}
 
     """
-    if config_edited.suffix == ".json":
-        flag = JSON_FLAG
-        sequence = config_edited.relative_to(rundir)
-        mlflow.log_param("sequence", sequence.stem)
-    else:
-        flag = ""
-        sequence = config_edited.stem
-        mlflow.log_param("sequence", sequence)
-
-    if mlflow_if_master():
-        fname_part = "master"
+    if jobopts.max_batch_size < 0:  # ghostbuster algorithm not included in sequence
+        fname_part = mlflow_src_branch()
     else:
         fname_part = jobopts.fname_part
+
+    flag = JSON_FLAG
+    sequence = config_edited.relative_to(rundir)
+    mlflow.log_param("sequence", sequence.stem)
 
     params = asdict(jobopts)
     params.update(sequence=str(sequence))
@@ -314,29 +279,15 @@ def mlflow_run(expt_name: str, path: str, opts: jobopts_t):
     # expt_id = mlflow.create_experiment(expt_name)
 
     _path = Path(path)
-    builddir = _path if _path.is_dir() else _path.parent
+    builddir = _path.parent
+    config = json.loads(_path.read_text())
 
     with sh.cd(builddir):
         tags = asdict(git_commit())
         print(tags)
 
     with mlflow.start_run(experiment_id=expt_id, tags=tags):
-        if opts.max_batch_size < 0:  # ghostbuster algorithm not included in sequence
-            if _path.is_dir():
-                config_edited = (
-                    git_root()
-                    / "configuration/python/AllenSequences/hlt1_pp_default.py"
-                )
-            else:
-                config_edited = _path
-        else:
-            if _path.is_dir():
-                rundir, config_edited = write_config_py(
-                    builddir, "ghostbuster_test", opts
-                )
-            else:
-                config = json.loads(_path.read_text())
-                rundir, config_edited = write_config_json(builddir, config, opts)
+        rundir, config_edited = write_config_json(builddir, config, opts)
         return runner(rundir, config_edited, opts)
 
 
@@ -345,8 +296,8 @@ if __name__ == "__main__":
 
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
-        "builddir_or_json",
-        help="Build directory or config JSON, directory should have the binary",
+        "config_json",
+        help="Config JSON, parent directory should have the binary",
     )
     parser.add_argument("--experiment-name", required=True)
     parser.add_argument("--batch-size-range", nargs=2, type=int)
@@ -374,7 +325,7 @@ if __name__ == "__main__":
     if opts.batch_size_range is None:
         # dummy parameter values, they are ignored when ghostbuster isn't included
         jobopts.max_batch_size = -1
-        metric = mlflow_run(opts.experiment_name, opts.builddir_or_json, jobopts)
+        metric = mlflow_run(opts.experiment_name, opts.config_json, jobopts)
         print(metric)
     else:
         for batch, no_infer, fp16 in param_matrix(
@@ -383,5 +334,5 @@ if __name__ == "__main__":
             jobopts.max_batch_size = batch
             jobopts.no_infer = no_infer
             jobopts.use_fp16 = fp16
-            metric = mlflow_run(opts.experiment_name, opts.builddir_or_json, jobopts)
+            metric = mlflow_run(opts.experiment_name, opts.config_json, jobopts)
             print(metric)
