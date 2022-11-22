@@ -179,9 +179,10 @@ def get_config(config: dict, opts: jobopts_t) -> dict:
     """
     params = asdict(opts)
     mlflow.log_params(params)
-    config["GhostProbabilityNN0"].update(
-        (k, v) for k, v in params.items() if k not in opts.not_props
-    )
+    for i in range(opts.copies):
+        config[f"GhostProbabilityNN{i}"].update(
+            (k, v) for k, v in params.items() if k not in opts.not_props
+        )
     return config
 
 
@@ -281,6 +282,14 @@ def mlflow_run(expt_name: str, path: str, opts: jobopts_t):
     _path = Path(path)
     builddir = _path.parent
     config = json.loads(_path.read_text())
+
+    copies = 0
+    for k in config.keys():
+        if k.startswith("GhostProbabilityNN"):
+            copies += 1
+    assert (
+        copies == opts.copies
+    ), f"ghostbuster counts don't match in base config: '{copies=}'!='{opts.copies=}'"
 
     with sh.cd(builddir):
         tags = asdict(git_commit())
