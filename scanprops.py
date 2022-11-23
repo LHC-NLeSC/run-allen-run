@@ -186,7 +186,7 @@ def get_config(config: dict, opts: jobopts_t) -> dict:
     return config
 
 
-def write_config_json(builddir: Path, config: dict, opts: jobopts_t):
+def write_config_json(builddir: Path, fname: str, config: dict, opts: jobopts_t):
     if opts.max_batch_size < 0:  # ghostbuster algorithm not included in sequence
         fname_part = mlflow_src_branch()
     else:
@@ -195,7 +195,7 @@ def write_config_json(builddir: Path, config: dict, opts: jobopts_t):
 
     rundir = builddir / Path(f"run-{fname_part}")
     rundir.mkdir(exist_ok=True)
-    config_edited = rundir / f"config-{fname_part}.json"
+    config_edited = rundir / f"{fname}-{fname_part}.json"
     config_edited.write_text(json.dumps(config, indent=4))
     return rundir, config_edited
 
@@ -270,7 +270,7 @@ def runner(rundir: Path, config_edited: Path, jobopts: jobopts_t) -> dict[str, f
 
 
 def mlflow_run(expt_name: str, path: str, opts: jobopts_t):
-    """Multiprocessing friendly wrapper to start an mlflow run"""
+    """Wrapper to start an mlflow run"""
     expts = mlflow.search_experiments(filter_string=f"name = {expt_name!r}")
     if not expts:
         print("Couldn't find experiment, please setup using CLI")
@@ -297,7 +297,7 @@ def mlflow_run(expt_name: str, path: str, opts: jobopts_t):
         print(tags)
 
     with mlflow.start_run(experiment_id=expt_id, tags=tags):
-        rundir, config_edited = write_config_json(builddir, config, opts)
+        rundir, config_edited = write_config_json(builddir, _path.stem, config, opts)
         return runner(rundir, config_edited, opts)
 
 
