@@ -283,13 +283,14 @@ def mlflow_run(expt_name: str, path: str, opts: jobopts_t):
     builddir = _path.parent
     config = json.loads(_path.read_text())
 
-    copies = 0
-    for k in config.keys():
-        if k.startswith("GhostProbabilityNN"):
-            copies += 1
-    assert (
-        copies == opts.copies
-    ), f"ghostbuster counts don't match in base config: '{copies=}'!='{opts.copies=}'"
+    if opts.max_batch_size >= 0:  # ghostbuster algorithm in sequence
+        copies = 0
+        for k in config.keys():
+            if k.startswith("GhostProbabilityNN"):
+                copies += 1
+        assert (
+            copies == opts.copies
+        ), f"ghostbuster counts don't match in base config: '{copies=}'!='{opts.copies=}'"
 
     with sh.cd(builddir):
         tags = asdict(git_commit())
