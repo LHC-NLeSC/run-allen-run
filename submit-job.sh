@@ -18,16 +18,14 @@ if [[ -d Allen-master ]]; then
     python ./scanprops.py Allen-master/build/hlt1_pp_default_seq.json \
 	   --experiment-name v100
 else
-    echo "Did you run ./build.sh?"
+    echo "Did you run ./build.sh & ./prepare.sh?"
     echo "No build of master branch found" > /dev/stderr
 fi
 
 if [[ -d Allen-ghostbuster ]]; then
-    for i in {1..4};
-    do
-	for f in nn nn_big;
-	do
-	    python ./scanprops.py Allen-ghostbuster/build/ \
+    for i in {1..5}; do
+	for f in nn nn_big; do
+	    python ./scanprops.py Allen-ghostbuster/build/ghostbuster_test_n${i}_seq.json \
 		   --experiment-name v100 \
 		   --batch-size-range 256 16000 \
 		   --no-infer \
@@ -38,6 +36,6 @@ if [[ -d Allen-ghostbuster ]]; then
     python ./scanprops.py Allen-ghostbuster/build/hlt1_pp_default_seq.json \
 	   --experiment-name v100
 else
-    echo "Did you run ./build.sh?"
+    echo "Did you run ./build.sh & ./prepare.sh?"
     echo "No build of ghostbuster branch found" > /dev/stderr
 fi
