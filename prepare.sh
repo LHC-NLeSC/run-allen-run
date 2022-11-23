@@ -14,14 +14,6 @@ declare branch=$(git branch --show-current)
 	exit
     }
 
-popd
-
-if [[ $branch =~ ghostbuster.* ]]; then
-    ./genconf.py "$builddir" --sequence ghostbuster_test --max-copies 5
-fi
-
-pushd "$builddir"
-
 function write_seq_2_json() {
     local sequence=$1
     ./toolchain/wrapper ./Allen -t 1 --events-per-slice 1000 -n 1000 -r 100 \
@@ -33,8 +25,9 @@ function write_seq_2_json() {
 write_seq_2_json hlt1_pp_default
 
 if [[ $branch =~ ghostbuster.* ]]; then
-    for i in {'',_n{1..5}}; do
-	write_seq_2_json ghostbuster_test$i
+    ./genconf.py . --sequence ghostbuster_test --max-copies 5
+    for i in {1..5}; do
+	write_seq_2_json ghostbuster_test_n$i
     done
 fi
 
