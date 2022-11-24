@@ -283,7 +283,7 @@ def mlflow_run(expt_name: str, path: str, opts: jobopts_t):
     builddir = _path.parent
     config = json.loads(_path.read_text())
 
-    if opts.max_batch_size >= 0:  # ghostbuster algorithm in sequence
+    if opts.max_batch_size > 0:  # ghostbuster algorithm in sequence
         copies = 0
         for k in config.keys():
             if k.startswith("GhostProbabilityNN"):
