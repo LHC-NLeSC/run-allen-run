@@ -13,7 +13,7 @@ pushd /project/bfys/$USER/codebaby/run-allen-run || exit
 source lhcb-setup.sh
 source venv/bin/activate
 
-mlflow experiments list 2>/dev/null | grep -q v100 || \
+mlflow experiments search 2>/dev/null | grep -q v100 || \
     mlflow experiments create -n v100
 
 if [[ -d Allen-master ]]; then
