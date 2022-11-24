@@ -15,6 +15,7 @@ mlflow experiments list 2>/dev/null | grep -q v100 || \
     mlflow experiments create -n v100
 
 if [[ -d Allen-master ]]; then
+    echo "Job (master): hlt1_pp_default_seq.json"
     python ./scanprops.py Allen-master/build/hlt1_pp_default_seq.json \
 	   --experiment-name v100
 else
@@ -25,6 +26,7 @@ fi
 if [[ -d Allen-ghostbuster ]]; then
     for i in {1..5}; do
 	for f in nn nn_big; do
+	    echo "Job (ghostbuster): ${i} copies of ghostbuster_test_n${i}_seq.json"
 	    python ./scanprops.py Allen-ghostbuster/build/ghostbuster_test_n${i}_seq.json \
 		   --experiment-name v100 \
 		   --batch-size-range 256 16000 \
@@ -33,6 +35,7 @@ if [[ -d Allen-ghostbuster ]]; then
 		   --copies $i
 	done
     done
+    echo "Job (ghostbuster): hlt1_pp_default_seq.json"
     python ./scanprops.py Allen-ghostbuster/build/hlt1_pp_default_seq.json \
 	   --experiment-name v100
 else
