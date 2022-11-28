@@ -58,3 +58,10 @@ Run the mlflow UI server
 ```
 $ mlflow ui
 ```
+
+## Notes on profiling
+
+```
+$ ./toolchain/wrapper ncu --set full -o <profile-output> <allen-cmd>
+$ ./toolchain/wrapper nsys profile -t cuda,nvtx,cudnn,cublas -o <profile-output> <allen-cmd>
+```
