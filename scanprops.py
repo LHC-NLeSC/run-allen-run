@@ -4,7 +4,7 @@
 """
 
 from dataclasses import asdict, dataclass
-from itertools import product
+from itertools import chain, product
 import json
 from math import log2
 import os
@@ -80,12 +80,13 @@ def param_matrix(batch_size_range: tuple[int, int], no_infer: bool, fp16: bool):
 
     """
     lo, hi = [round_up_2(i) for i in batch_size_range]
-    batch_sizes = (1 << i for i in range(int(log2(lo)), int(log2(hi) + 1)))
-    return product(
-        batch_sizes,
-        (True, False) if no_infer else (False,),
-        (True, False) if fp16 else (False,),
-    )
+    batch_sizes = [1 << i for i in range(int(log2(lo)), int(log2(hi) + 1))]
+    fp16_opts = (True, False) if fp16 else (False,)
+    perms = product(batch_sizes, (False,), fp16_opts)
+    if no_infer:
+        return chain(perms, product([batch_sizes[-1]], (True,), fp16_opts))
+    else:
+        return perms
 
 
 @dataclass
