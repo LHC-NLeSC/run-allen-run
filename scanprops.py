@@ -113,6 +113,12 @@ def git_commit() -> Source:
     )
 
 
+def git_diff_stat() -> list[str]:
+    return [
+        line.rsplit()[-1] for line in sh.git("diff-index", "HEAD").strip().split("\n")
+    ]
+
+
 def git_root() -> Path:
     return Path(shtrip(sh.git("rev-parse", "--show-toplevel")))
 
@@ -295,6 +301,8 @@ def mlflow_run(expt_name: str, path: str, opts: jobopts_t):
 
     with sh.cd(builddir):
         tags = asdict(git_commit())
+        if tags["dirty"]:
+            tags["dirty_files"] = git_diff_stat()
         print(tags)
 
     with mlflow.start_run(experiment_id=expt_id, tags=tags):

@@ -18,6 +18,7 @@ mlflow experiments search 2>/dev/null | grep -q v100 || \
 
 if [[ -d Allen-master ]]; then
     echo "Job (master): hlt1_pp_default_seq.json" |& tee -a current.log
+    cp -v ./allen_benchmarks.py Allen-master/configuration/python/AllenCore/ |& tee -a current.log
     python ./scanprops.py Allen-master/build/hlt1_pp_default_seq.json \
 	   --experiment-name v100
 else
@@ -26,6 +27,8 @@ else
 fi
 
 if [[ -d Allen-ghostbuster ]]; then
+    echo "Jobs w/ ghostbuster:" |& tee -a current.log
+    cp -v ./allen_benchmarks.py Allen-ghostbuster/configuration/python/AllenCore/ |& tee -a current.log
     for i in {1..5}; do
 	for f in nn nn_big; do
 	    echo "Job (ghostbuster): ghostbuster_test_n${i}_seq.json" |& tee -a current.log
