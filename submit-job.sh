@@ -20,7 +20,7 @@ if [[ -d Allen-master ]]; then
     echo "Job (master): hlt1_pp_default_seq.json" |& tee -a current.log
     cp -v ./allen_benchmarks.py Allen-master/configuration/python/AllenCore/ |& tee -a current.log
     python ./scanprops.py Allen-master/build/hlt1_pp_default_seq.json \
-	   --experiment-name v100
+	   --experiment-name v100 |& tee -a current.log
 else
     echo "Did you run ./build.sh & ./prepare.sh?" |& tee -a current.log
     echo "No build of master branch found" |& tee -a current.log > /dev/stderr
@@ -37,12 +37,12 @@ if [[ -d Allen-ghostbuster ]]; then
 		   --batch-size-range 256 16000 \
 		   --no-infer \
 		   --onnx-input /project/bfys/$USER/codebaby/Allen/input/ghost_${f}.onnx \
-		   --copies $i
+		   --copies $i |& tee -a current.log
 	done
     done
     echo "Job (ghostbuster): hlt1_pp_default_seq.json" |& tee -a current.log
     python ./scanprops.py Allen-ghostbuster/build/hlt1_pp_default_seq.json \
-	   --experiment-name v100
+	   --experiment-name v100 |& tee -a current.log
 else
     echo "Did you run ./build.sh & ./prepare.sh?" |& tee -a current.log
     echo "No build of ghostbuster branch found" |& tee -a current.log > /dev/stderr
