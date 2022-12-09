@@ -40,11 +40,11 @@ def get_df(csv, before: str = "", after: str = "") -> pd.DataFrame:
         if col in df.columns:
             df[col] = pd.to_datetime(df[col])
 
-    # df["copies"] = df.copies.astype("Int64")
-    df["onnx_input"] = df.onnx_input.dropna().map(lambda p: Path(p).stem)
-    # .astype("string")
+    if all(map(lambda i: i in df.columns, ("copies", "onnx_input"))):
+        df["copies"] = df.copies.fillna(1).infer_objects()
+        df["onnx_input"] = df.onnx_input.dropna().map(lambda p: Path(p).stem)
+        # .astype("string")
 
-    df = df.drop(columns=["input_name", "use_fp16"])
     cols = ~np.array(
         [
             df.iloc[:, i].name == "duration" and isinstance(df.iloc[0, i], str)
