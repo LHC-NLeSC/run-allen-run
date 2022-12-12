@@ -15,7 +15,8 @@ declare repo="$1" branch="$2"
 srcdir="$(basename $repo)-${branch}"
 if [[ -d $srcdir/.git ]]; then
     pushd $srcdir
-    git pull
+    git fetch
+    git reset --hard FETCH_HEAD
     popd
 else
     git clone "$repo" -b $branch "$srcdir"
