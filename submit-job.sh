@@ -35,6 +35,7 @@ if [[ -d Allen-ghostbuster ]]; then
 	    python ./scanprops.py Allen-ghostbuster/build/ghostbuster_test_n${i}_seq.json \
 		   --experiment-name v100 \
 		   --batch-size-range 256 16000 \
+		   --fp16 \
 		   --no-infer \
 		   --onnx-input /project/bfys/$USER/codebaby/Allen/input/ghost_${f}.onnx \
 		   --copies $i
