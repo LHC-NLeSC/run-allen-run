@@ -1,3 +1,4 @@
+#!/usr/bin/env python
 from pathlib import Path
 
 import matplotlib.pyplot as plt
@@ -40,11 +41,11 @@ def get_df(csv, before: str = "", after: str = "") -> pd.DataFrame:
         if col in df.columns:
             df[col] = pd.to_datetime(df[col])
 
-    # df["copies"] = df.copies.astype("Int64")
-    df["onnx_input"] = df.onnx_input.dropna().map(lambda p: Path(p).stem)
-    # .astype("string")
+    if all(map(lambda i: i in df.columns, ("copies", "onnx_input"))):
+        df["copies"] = df.copies.fillna(1).infer_objects()
+        df["onnx_input"] = df.onnx_input.dropna().map(lambda p: Path(p).stem)
+        # .astype("string")
 
-    df = df.drop(columns=["input_name", "use_fp16"])
     cols = ~np.array(
         [
             df.iloc[:, i].name == "duration" and isinstance(df.iloc[0, i], str)
@@ -53,6 +54,51 @@ def get_df(csv, before: str = "", after: str = "") -> pd.DataFrame:
     )
     df = df.iloc[:, cols]
     return df
+
+
+def df_extend_if(ghostbuster: pd.DataFrame, baseline: pd.DataFrame) -> pd.DataFrame:
+    """Extend the dataframe from ghostbuster jobs for easier plotting"""
+
+    def extend_batch(row, sizes):
+        res = pd.concat([row] * len(sizes), axis=1).T
+        res["max_batch_size"] = sizes
+        return res.infer_objects()
+
+    batch_sizes = ghostbuster.max_batch_size.unique()
+    dfs = [ghostbuster.query("~no_infer")]
+
+    df_ni = ghostbuster.query("no_infer")
+    if len(df_ni.max_batch_size.unique()) == 1:
+        dfs.extend(extend_batch(row, batch_sizes) for _, row in df_ni.iterrows())
+
+    dfs.extend(extend_batch(row, batch_sizes) for _, row in baseline.iterrows())
+    return pd.concat(dfs, axis=0).reset_index(drop=True)
+
+
+def get_facets(df: pd.DataFrame):
+    if all(map(lambda i: i in df.columns, ("copies", "onnx_input"))):
+        max_copies = int(df.copies.max())
+        add_opts = {
+            "hue": "copies",
+            "palette": sns.color_palette("colorblind")[:max_copies],
+            "col": "onnx_input",
+        }
+    else:
+        add_opts = {}
+
+    facets = sns.relplot(
+        data=df,
+        x="max_batch_size",
+        y="event_rate",
+        style="no_infer",
+        dashes=False,
+        markers=True,
+        kind="line",
+        **add_opts,
+    )
+    # facets.refline(y=baseline.iloc[0, 1], label=baseline.iloc[0, 0], linestyle="--")
+    # facets.refline(y=baseline.iloc[1, 1], label=baseline.iloc[1, 0], linestyle=":")
+    return facets
 
 
 if __name__ == "__main__":
@@ -71,27 +117,10 @@ if __name__ == "__main__":
     opts = parser.parse_args()
 
     df = get_df(opts.csv, after=opts.after, before=opts.before)
-    baseline = df[df.sequence.str.contains("hlt1")][["branch", "event_rate"]]
     ghostbuster = df[df.sequence.str.startswith("ghostbuster")]
-    max_copies = int(ghostbuster.copies.max())
+    baseline = df[df.sequence.str.contains("hlt1")]
+    baseline["no_infer"] = baseline["branch"]
+    df_plot = df_extend_if(ghostbuster, baseline)
 
-    # plt.ion()
-
-    facets = sns.relplot(
-        data=ghostbuster,
-        x="max_batch_size",
-        y="event_rate",
-        hue="copies",
-        palette=sns.color_palette("colorblind")[:max_copies],
-        style="no_infer",
-        dashes=False,
-        markers=True,
-        col="onnx_input",
-        kind="line",
-    )
-    facets.refline(y=baseline.iloc[0, 1], label=baseline.iloc[0, 0], linestyle="--")
-    facets.refline(y=baseline.iloc[1, 1], label=baseline.iloc[1, 0], linestyle=":")
-
-    # FIXME: add the baseline legend next to the others
-    plt.legend()
+    facets = get_facets(df_plot)
     facets.savefig("evt-rate-vs-batch-size-comparison.png")
