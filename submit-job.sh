@@ -3,7 +3,7 @@
 # exclusive node
 #PBS -n
 #PBS -l nodes=1:v100
-#PBS -l walltime=24:00:00
+#PBS -l walltime=36:00:00
 #PBS -l mem=4gb
 
 echo "Job: ${PBS_JOBID}" |& tee current.log
