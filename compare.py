@@ -81,7 +81,8 @@ def get_facets(df: pd.DataFrame):
         add_opts = {
             "hue": "copies",
             "palette": sns.color_palette("colorblind")[:max_copies],
-            "col": "onnx_input",
+            "row": "onnx_input",
+            "col": "use_fp16",
         }
     else:
         add_opts = {}
