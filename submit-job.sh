@@ -16,16 +16,6 @@ source venv/bin/activate
 mlflow experiments search 2>/dev/null | grep -q v100 || \
     mlflow experiments create -n v100
 
-if [[ -d Allen-master ]]; then
-    echo "Job (master): hlt1_pp_default_seq.json" |& tee -a current.log
-    cp -v ./allen_benchmarks.py Allen-master/configuration/python/AllenCore/ |& tee -a current.log
-    python ./scanprops.py Allen-master/build/hlt1_pp_default_seq.json \
-	   --experiment-name v100 |& tee -a current.log
-else
-    echo "Did you run ./build.sh & ./prepare.sh?" |& tee -a current.log
-    echo "No build of master branch found" |& tee -a current.log > /dev/stderr
-fi
-
 if [[ -d Allen-ghostbuster ]]; then
     echo "Jobs w/ ghostbuster:" |& tee -a current.log
     cp -v ./allen_benchmarks.py Allen-ghostbuster/configuration/python/AllenCore/ |& tee -a current.log
