@@ -3,7 +3,7 @@
 # exclusive node
 #PBS -n
 #PBS -l nodes=1:v100
-#PBS -l walltime=36:00:00
+#PBS -l walltime=72:00:00
 #PBS -l mem=4gb
 
 echo "Job: ${PBS_JOBID}" |& tee current.log
@@ -30,7 +30,7 @@ if [[ -d Allen-ghostbuster ]]; then
     echo "Jobs w/ ghostbuster:" |& tee -a current.log
     cp -v ./allen_benchmarks.py Allen-ghostbuster/configuration/python/AllenCore/ |& tee -a current.log
     for i in {1..5}; do
-	for f in nn nn_big; do
+	for f in nn_tiny nn nn_big nn_bigger; do
 	    echo "Job (ghostbuster): ghostbuster_test_n${i}_seq.json" |& tee -a current.log
 	    python ./scanprops.py Allen-ghostbuster/build/ghostbuster_test_n${i}_seq.json \
 		   --experiment-name v100 \
