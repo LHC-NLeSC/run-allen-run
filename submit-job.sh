@@ -6,6 +6,7 @@
 #PBS -l walltime=96:00:00
 #PBS -l mem=4gb
 
+rm -f current.log
 echo "Job: ${PBS_JOBID}" |& tee current.log
 
 pushd /project/bfys/$USER/codebaby/run-allen-run || exit
