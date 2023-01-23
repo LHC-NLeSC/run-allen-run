@@ -1,29 +1,35 @@
 #!/usr/bin/env python
 from pathlib import Path
+from typing import cast
 
 import matplotlib.pyplot as plt
 import numpy as np
 import seaborn as sns
 import pandas as pd
 
-drop_cols = [
-    "source_name",
-    "source_type",
-    "user",
-    "status",
-    "dirty",
-    "run_id",
-    "commit",
-    "date",
+rename = {"Duration": "job_duration"}
+# convert to seconds: pd.to_timedelta(df["job_duration"]).dt.total_seconds()
+
+keep = [
+    "name",
+    "copies",
+    "input_name",
+    "max_batch_size",
+    "no_infer",
+    "onnx_input",
+    "sequence",
+    "use_fp16",
+    "duration",
+    "event_rate",
+    "branch",
 ]
 
 
 def get_df(csv, before: str = "", after: str = "") -> pd.DataFrame:
-    df = pd.read_csv(csv)
-    df.columns = df.columns.str.replace(" ", "_").str.lower()
-    df = df.drop(drop_cols, axis=1)
+    df = cast(pd.DataFrame, pd.read_csv(csv)).rename(columns=rename)
+    df.columns = df.columns.str.replace(" ", "_").str.casefold()
 
-    queries = []
+    queries = ["status == 'FINISHED'"]  # drop failed/incomplete jobs
     if before:
         queries += [f"start_time < {before!r}"]
     if after:
@@ -46,13 +52,7 @@ def get_df(csv, before: str = "", after: str = "") -> pd.DataFrame:
         df["onnx_input"] = df.onnx_input.dropna().map(lambda p: Path(p).stem)
         # .astype("string")
 
-    cols = ~np.array(
-        [
-            df.iloc[:, i].name == "duration" and isinstance(df.iloc[0, i], str)
-            for i in range(len(df.columns))
-        ]
-    )
-    df = df.iloc[:, cols]
+    df = df.loc[:, keep]
     return df
 
 
