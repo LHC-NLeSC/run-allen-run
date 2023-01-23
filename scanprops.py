@@ -84,7 +84,8 @@ def param_matrix(batch_size_range: tuple[int, int], no_infer: bool, fp16: bool):
     fp16_opts = (True, False) if fp16 else (False,)
     perms = product(batch_sizes, (False,), fp16_opts)
     if no_infer:
-        return chain(perms, product([batch_sizes[-1]], (True,), fp16_opts))
+        # no inference, doesn't matter if FP16 is enabled
+        return chain(perms, product([batch_sizes[-1]], (True,), (False,)))
     else:
         return perms
 
