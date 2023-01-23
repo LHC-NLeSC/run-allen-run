@@ -105,15 +105,18 @@ def get_facets(df: pd.DataFrame):
 if __name__ == "__main__":
     import argparse
 
-    parser = argparse.ArgumentParser()
+    doc = "Runs maybe filtered on date using --before/after"
+    parser = argparse.ArgumentParser(description=doc)
     parser.add_argument("csv", help="CSV file with run statistics")
     parser.add_argument(
-        "--after", default="", help="Datetime string (%Y-%m-%d %H:%M:%s) to filter runs"
+        "--after",
+        default="",
+        help="Datetime string (%%Y-%%m-%%d %%H:%%M:%%s) to filter runs",
     )
     parser.add_argument(
         "--before",
         default="",
-        help="Datetime string (%Y-%m-%d %H:%M:%s) to filter runs",
+        help="Datetime string (%%Y-%%m-%%d %%H:%%M:%%s) to filter runs",
     )
     opts = parser.parse_args()
 
