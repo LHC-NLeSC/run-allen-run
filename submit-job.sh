@@ -47,7 +47,7 @@ for i in {1..5}; do
 	echo "onnx: ${onnx_input}" |& tee -a current.log
 	python ./scanprops.py ${json_config} \
 	       --experiment-name v100 \
-	       --batch-size-range 256 16000 \
+	       --batch-size-range 1000 16000 \
 	       --fp16 \
 	       --int8 \
 	       --no-infer \
@@ -56,6 +56,6 @@ for i in {1..5}; do
     done
 done
 
-echo "config: hlt1_pp_default_seq.json" |& tee -a current.log
-python ./scanprops.py Allen-ghostbuster/build/hlt1_pp_default_seq.json \
-	   --experiment-name v100 |& tee -a current.log
+# echo "config: hlt1_pp_default_seq.json" |& tee -a current.log
+# python ./scanprops.py Allen-ghostbuster/build/hlt1_pp_default_seq.json \
+# 	   --experiment-name v100 |& tee -a current.log
