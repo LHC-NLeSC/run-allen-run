@@ -62,6 +62,7 @@ if __name__ == "__main__":
         max_batch_size=1024,
         no_infer=False,
         use_fp16=False,
+        use_int8=False,
         onnx_input="/project/bfys/suvayua/codebaby/Allen/input/ghost_nn.onnx",
         input_name="dense_input",
         copies=opts.max_copies,

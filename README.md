@@ -77,3 +77,4 @@ To add a new option, the following functions need to be updated:
 - `jobopt_t` instance in the entry point
 - the for-loop over `param_matrix` in the entry point
 - add option in submit-job.sh
+- update `jobopts_t` dataclass instance in `genconf.py`
