@@ -49,6 +49,7 @@ for i in {1..5}; do
 	       --experiment-name v100 \
 	       --batch-size-range 256 16000 \
 	       --fp16 \
+	       --int8 \
 	       --no-infer \
 	       --onnx-input ${onnx_input} \
 	       --copies $i |& tee -a current.log

@@ -10,7 +10,7 @@ from math import log2
 import os
 from pathlib import Path
 import re
-from typing import Union
+from typing import Iterable, Union
 
 import mlflow
 import onnx
@@ -55,7 +55,9 @@ def round_up_2(val: int) -> int:
     return val
 
 
-def param_matrix(batch_size_range: tuple[int, int], no_infer: bool, fp16: bool):
+def param_matrix(
+    batch_size_range: tuple[int, int], no_infer: bool, fp16: bool, int8: bool
+) -> Iterable[tuple[int, bool, bool, bool]]:
     """Create all permutations from a range of batch sizes, no infer, and use fp16
 
     Parameters
@@ -74,20 +76,26 @@ def param_matrix(batch_size_range: tuple[int, int], no_infer: bool, fp16: bool):
       If True, permutation also includes fp16 support set to True or False, it
       is set to False otherwise
 
+    int8: bool
+
+      If True, permutation also includes int8 support set to True or False, it
+      is set to False otherwise
+
     Returns
     -------
-    product[tuple[int, bool]]
+    Iterable[tuple[int, bool, bool, bool]]
 
     """
     lo, hi = [round_up_2(i) for i in batch_size_range]
     batch_sizes = [1 << i for i in range(int(log2(lo)), int(log2(hi) + 1))]
     fp16_opts = (True, False) if fp16 else (False,)
-    perms = product(batch_sizes, (False,), fp16_opts)
+    int8_opts = (True, False) if int8 else (False,)
+    perms = product(batch_sizes, (False,), fp16_opts, int8_opts)
     if no_infer:
         # no inference, doesn't matter if FP16 is enabled
-        return chain(perms, product([batch_sizes[-1]], (True,), (False,)))
+        return chain(perms, product([batch_sizes[-1]], (True,), (False,), (False,)))
     else:
-        return perms
+        return (opts for opts in perms if not (opts[2] == opts[3] == True))
 
 
 @dataclass
@@ -137,6 +145,7 @@ class jobopts_t:
     input_name: str
     no_infer: bool = False
     use_fp16: bool = False
+    use_int8: bool = False
     copies: int = 1
 
     @property
@@ -151,6 +160,7 @@ class jobopts_t:
         fname_part = "batch-size-{max_batch_size}-"
         fname_part += "no-infer-{no_infer}-"
         fname_part += "fp16-{use_fp16}-"
+        fname_part += "int8-{use_int8}-"
         fname_part += "onnx-{onnx_input}"
         return fname_part.format(**params)
 
@@ -177,6 +187,7 @@ def get_config(config: dict, opts: jobopts_t) -> dict:
       - batch_size: maximum batch size for our algorithm ("GhostProbabilityNN")
       - no_infer: whether to disable inference for benchmarking
       - use_fp16: whether to enable FP16 optimisation
+      - use_int8: whether to enable INT8 optimisation
 
     Returns
     -------
@@ -323,6 +334,7 @@ if __name__ == "__main__":
     parser.add_argument("--batch-size-range", nargs=2, type=int)
     parser.add_argument("--no-infer", action="store_true", help="Toggle inference")
     parser.add_argument("--fp16", action="store_true", help="Benchmark FP16 support")
+    parser.add_argument("--int8", action="store_true", help="Benchmark INT8 support")
     parser.add_argument(
         "--onnx-input",
         default="/project/bfys/suvayua/codebaby/Allen/input/ghost_nn.onnx",
@@ -337,6 +349,7 @@ if __name__ == "__main__":
         max_batch_size=-1,  # dummy
         no_infer=opts.no_infer,
         use_fp16=opts.fp16,
+        use_int8=opts.int8,
         onnx_input=opts.onnx_input,
         input_name=onnx_input_name(opts.onnx_input),
         copies=opts.copies,
@@ -348,8 +361,8 @@ if __name__ == "__main__":
         metric = mlflow_run(opts.experiment_name, opts.config_json, jobopts)
         print(metric)
     else:
-        for batch, no_infer, fp16 in param_matrix(
-            opts.batch_size_range, opts.no_infer, opts.fp16
+        for batch, no_infer, fp16, int8 in param_matrix(
+            opts.batch_size_range, opts.no_infer, opts.fp16, opts.int8
         ):
             jobopts.max_batch_size = batch
             jobopts.no_infer = no_infer

@@ -65,3 +65,15 @@ $ mlflow ui
 $ ./toolchain/wrapper ncu --set full -o <profile-output> <allen-cmd>
 $ ./toolchain/wrapper nsys profile -t cuda,nvtx,cudnn,cublas -o <profile-output> <allen-cmd>
 ```
+
+## Adding a new option
+To add a new option, the following functions need to be updated:
+- add a corresponding property in the `scanprops.jobopts_t` dataclass
+  - update `jobopts_t.fname_part`
+- `scanprops.param_matrix`: ensures the option is included in all
+  permutations
+- `scanprops.get_config`: update the docstring
+- CLI argument parser
+- `jobopt_t` instance in the entry point
+- the for-loop over `param_matrix` in the entry point
+- add option in submit-job.sh
