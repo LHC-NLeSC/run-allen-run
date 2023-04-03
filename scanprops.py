@@ -95,7 +95,7 @@ def param_matrix(
         # no inference, doesn't matter if FP16 is enabled
         return chain(perms, product([batch_sizes[-1]], (True,), (False,), (False,)))
     else:
-        return (opts for opts in perms if not (opts[2] == opts[3] == True))
+        return (opts for opts in perms if not (opts[2] is True and opts[3] is True))
 
 
 @dataclass
@@ -367,5 +367,6 @@ if __name__ == "__main__":
             jobopts.max_batch_size = batch
             jobopts.no_infer = no_infer
             jobopts.use_fp16 = fp16
+            jobopts.use_int8 = int8
             metric = mlflow_run(opts.experiment_name, opts.config_json, jobopts)
             print(metric)
