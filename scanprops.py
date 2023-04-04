@@ -90,12 +90,16 @@ def param_matrix(
     batch_sizes = [1 << i for i in range(int(log2(lo)), int(log2(hi) + 1))]
     fp16_opts = (True, False) if fp16 else (False,)
     int8_opts = (True, False) if int8 else (False,)
-    perms = product(batch_sizes, (False,), fp16_opts, int8_opts)
+    perms = (
+        opts
+        for opts in product(batch_sizes, (False,), fp16_opts, int8_opts)
+        if not (opts[2] is True and opts[3] is True)
+    )
     if no_infer:
-        # no inference, doesn't matter if FP16 is enabled
+        # w/ no inference, doesn't matter if FP16 is enabled
         return chain(perms, product([batch_sizes[-1]], (True,), (False,), (False,)))
     else:
-        return (opts for opts in perms if not (opts[2] is True and opts[3] is True))
+        return perms
 
 
 @dataclass

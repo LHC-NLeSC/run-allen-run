@@ -2,3 +2,4 @@ mlflow
 onnx
 seaborn
 sh
+pytest
