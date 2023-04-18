@@ -55,6 +55,12 @@ def round_up_2(val: int) -> int:
     return val
 
 
+def expand_range_2(start: int, stop: int) -> list[int]:
+    """Expand a range of numbers to a list of powers of 2"""
+    lo, hi = [round_up_2(i) for i in (start, stop)]
+    return [1 << i for i in range(int(log2(lo)), int(log2(hi) + 1))]
+
+
 def param_matrix(
     batch_size_range: tuple[int, int], no_infer: bool, fp16: bool, int8: bool
 ) -> Iterable[tuple[int, bool, bool, bool]]:
@@ -86,8 +92,7 @@ def param_matrix(
     Iterable[tuple[int, bool, bool, bool]]
 
     """
-    lo, hi = [round_up_2(i) for i in batch_size_range]
-    batch_sizes = [1 << i for i in range(int(log2(lo)), int(log2(hi) + 1))]
+    batch_sizes = expand_range_2(*batch_size_range)
     fp16_opts = (True, False) if fp16 else (False,)
     int8_opts = (True, False) if int8 else (False,)
     perms = (
