@@ -156,6 +156,7 @@ class jobopts_t:
     use_fp16: bool = False
     use_int8: bool = False
     copies: int = 1
+    block_dim: int = 256
 
     @property
     def not_props(self):
@@ -170,6 +171,7 @@ class jobopts_t:
         fname_part += "no-infer-{no_infer}-"
         fname_part += "fp16-{use_fp16}-"
         fname_part += "int8-{use_int8}-"
+        fname_part += "block-dim-{block_dim}-"
         fname_part += "onnx-{onnx_input}"
         return fname_part.format(**params)
 
@@ -214,7 +216,9 @@ def get_config(config: dict, opts: jobopts_t) -> dict:
     return config
 
 
-def write_config_json(builddir: Path, fname: str, config: dict, opts: jobopts_t):
+def write_config_json(
+    builddir: Path, fname: str, config: dict, opts: jobopts_t
+) -> tuple[Path, Path]:
     if opts.max_batch_size < 0:  # ghostbuster algorithm not included in sequence
         fname_part = mlflow_src_branch()
     else:
@@ -352,6 +356,9 @@ if __name__ == "__main__":
     parser.add_argument(
         "--copies", type=int, default=1, help="Number of algo instances"
     )
+    parser.add_argument(
+        "--block-dim-range", nargs=2, type=int, help="Block dimension range"
+    )
 
     opts = parser.parse_args()
     jobopts = jobopts_t(
@@ -377,5 +384,11 @@ if __name__ == "__main__":
             jobopts.no_infer = no_infer
             jobopts.use_fp16 = fp16
             jobopts.use_int8 = int8
-            metric = mlflow_run(opts.experiment_name, opts.config_json, jobopts)
-            print(metric)
+            if opts.block_dim_range is None:
+                metric = mlflow_run(opts.experiment_name, opts.config_json, jobopts)
+                print(metric)
+            else:
+                for block_dim in expand_range_2(*opts.block_dim_range):
+                    jobopts.block_dim = block_dim
+                    metric = mlflow_run(opts.experiment_name, opts.config_json, jobopts)
+                    print(metric)
