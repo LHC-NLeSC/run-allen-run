@@ -1,6 +1,12 @@
 #!/usr/bin/env python
 """Scan algorithm parameters for benchmarking
 
+There are 3 modes:
+- run vanilla (no ghostbuster), to do that do not pass a batch size range
+- run ghostbuster with TensorRT, provide a batch size range and ONNX input
+- run a hand coded version of ghostbuster, you can provide a batch size/block
+  dimension range, but no need for an ONNX input
+
 """
 
 from dataclasses import asdict, dataclass
@@ -359,9 +365,20 @@ def mlflow_run(expt_name: str, path: str, opts: jobopts_t | joboptshc_t):
 
 
 if __name__ == "__main__":
-    import argparse
+    from argparse import (
+        ArgumentParser,
+        ArgumentDefaultsHelpFormatter,
+        RawDescriptionHelpFormatter,
+    )
 
-    parser = argparse.ArgumentParser(description=__doc__)
+    class RawArgDefaultFormatter(
+        ArgumentDefaultsHelpFormatter, RawDescriptionHelpFormatter
+    ):
+        """Combine raw help text formatting with default argument display."""
+
+        pass
+
+    parser = ArgumentParser(description=__doc__, formatter_class=RawArgDefaultFormatter)
     parser.add_argument(
         "config_json",
         help="Config JSON, parent directory should have the binary",
