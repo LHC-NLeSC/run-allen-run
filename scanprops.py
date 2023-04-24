@@ -28,8 +28,8 @@ ALLEN_CMD = [
     "../toolchain/wrapper",
     "../Allen -g ../../input/detector_configuration/ "
     "-t 12 --events-per-slice 1000 -n 1000 -r 100 "
-    "{flag} --sequence {sequence} "
-    "--mdf /data/bfys/raaij/upgrade/MiniBrunel_2018_MinBias_FTv4_DIGI_retinacluster_v1.mdf",
+    "{flag} --sequence {sequence} --mdf "
+    "/data/bfys/raaij/upgrade/MiniBrunel_2018_MinBias_FTv4_DIGI_retinacluster_v1.mdf",
 ]
 
 JSON_FLAG = "--run-from-json 1"
