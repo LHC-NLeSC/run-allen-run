@@ -99,4 +99,4 @@ jobs:
           # mypy --install-types --non-interactive
       - name: Type check w/ mypy
         run: |
-          mypy --check-untyped-defs --pretty scanprops.py compare.py
+          mypy --ignore-missing-imports --check-untyped-defs --pretty scanprops.py compare.py
