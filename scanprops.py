@@ -201,12 +201,15 @@ class jobopts_t:
         return fname_part.format(**params)
 
 
+opts_t = Union[jobopts_t, joboptshc_t]
+
+
 def onnx_input_name(onnx_input: str):
     """Return the input array name for the ONNX file"""
     return onnx.load(onnx_input).graph.input[0].name
 
 
-def get_config(config: dict, opts: Union[jobopts_t, joboptshc_t]) -> dict:
+def get_config(config: dict, opts: opts_t) -> dict:
     """Get config with new parameter values, and log them w/ mlflow
 
     Also encode the parameters in a string to be used in file names.
@@ -247,7 +250,7 @@ def get_config(config: dict, opts: Union[jobopts_t, joboptshc_t]) -> dict:
 
 
 def write_config_json(
-    builddir: Path, fname: str, config: dict, opts: Union[jobopts_t, joboptshc_t]
+    builddir: Path, fname: str, config: dict, opts: opts_t
 ) -> tuple[Path, Path]:
     if opts.max_batch_size < 0:  # ghostbuster algorithm not included in sequence
         fname_part = mlflow_src_branch()
@@ -262,9 +265,7 @@ def write_config_json(
     return rundir, config_edited
 
 
-def runner(
-    rundir: Path, config_edited: Path, jobopts: Union[jobopts_t, joboptshc_t]
-) -> dict[str, float]:
+def runner(rundir: Path, config_edited: Path, jobopts: opts_t) -> dict[str, float]:
     """Run Allen with the configuration, and log the metrics w/ mlflow
 
     Log files are saved in the run directory (logged as artifacts w/ mlflow):
@@ -333,7 +334,7 @@ def runner(
     return metrics
 
 
-def mlflow_run(expt_name: str, path: str, opts: Union[jobopts_t, joboptshc_t]):
+def mlflow_run(expt_name: str, path: str, opts: opts_t):
     """Wrapper to start an mlflow run"""
     expts = mlflow.search_experiments(filter_string=f"name = {expt_name!r}")
     if not expts:
@@ -400,7 +401,7 @@ if __name__ == "__main__":
 
     opts = parser.parse_args()
 
-    jobopts: jobopts_t | joboptshc_t
+    jobopts: opts_t
     if opts.onnx_input is None:
         jobopts = joboptshc_t(max_batch_size=-1)
     else:
