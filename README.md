@@ -1,3 +1,5 @@
+[![Unit tests](https://github.com/LHC-NLeSC/run-allen-run/actions/workflows/python-ci.yml/badge.svg)](https://github.com/LHC-NLeSC/run-allen-run/actions/workflows/python-ci.yml)
+
 # Run Allen for benchmarking
 
 Run Allen with different algorithm properties
