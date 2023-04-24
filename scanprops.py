@@ -316,13 +316,10 @@ def mlflow_run(expt_name: str, path: str, opts: jobopts_t):
     config = json.loads(_path.read_text())
 
     if opts.max_batch_size > 0:  # ghostbuster algorithm in sequence
-        copies = 0
-        for k in config.keys():
-            if k.startswith("GhostProbabilityNN"):
-                copies += 1
+        copies = len([k for k in config.keys() if k.startswith("GhostProbabilityNN")])
         assert (
             copies == opts.copies
-        ), f"ghostbuster counts don't match in base config: '{copies=}'!='{opts.copies=}'"
+        ), f"number of copies don't match in base config: '{copies=}'!='{opts.copies=}'"
 
     with sh.cd(builddir):
         tags = asdict(git_commit())
@@ -349,9 +346,7 @@ if __name__ == "__main__":
     parser.add_argument("--fp16", action="store_true", help="Benchmark FP16 support")
     parser.add_argument("--int8", action="store_true", help="Benchmark INT8 support")
     parser.add_argument(
-        "--onnx-input",
-        default="/project/bfys/suvayua/codebaby/Allen/input/ghost_nn.onnx",
-        help="Path to ONNX file that should be used for inference",
+        "--onnx-input", help="Path to ONNX file that should be used for inference"
     )
     parser.add_argument(
         "--copies", type=int, default=1, help="Number of algo instances"
