@@ -155,8 +155,8 @@ class jobopts_t:
     no_infer: bool = False
     use_fp16: bool = False
     use_int8: bool = False
+    block_dim: tuple[int, int, int] = (256, 1, 1)
     copies: int = 1
-    block_dim: int = 256
 
     @property
     def not_props(self):
@@ -171,7 +171,7 @@ class jobopts_t:
         fname_part += "no-infer-{no_infer}-"
         fname_part += "fp16-{use_fp16}-"
         fname_part += "int8-{use_int8}-"
-        fname_part += "block-dim-{block_dim}-"
+        fname_part += "block-dim-{block_dim[0]}-"
         fname_part += "onnx-{onnx_input}"
         return fname_part.format(**params)
 
@@ -381,14 +381,15 @@ if __name__ == "__main__":
             opts.batch_size_range, opts.no_infer, opts.fp16, opts.int8
         ):
             jobopts.max_batch_size = batch
-            jobopts.no_infer = no_infer
-            jobopts.use_fp16 = fp16
-            jobopts.use_int8 = int8
+            if isinstance(jobopts, jobopts_t):  # onnx
+                jobopts.no_infer = no_infer
+                jobopts.use_fp16 = fp16
+                jobopts.use_int8 = int8
             if opts.block_dim_range is None:
                 metric = mlflow_run(opts.experiment_name, opts.config_json, jobopts)
                 print(metric)
             else:
                 for block_dim in expand_range_2(*opts.block_dim_range):
-                    jobopts.block_dim = block_dim
+                    jobopts.block_dim = (block_dim, 1, 1)
                     metric = mlflow_run(opts.experiment_name, opts.config_json, jobopts)
                     print(metric)
