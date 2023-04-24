@@ -206,7 +206,7 @@ def onnx_input_name(onnx_input: str):
     return onnx.load(onnx_input).graph.input[0].name
 
 
-def get_config(config: dict, opts: jobopts_t | joboptshc_t) -> dict:
+def get_config(config: dict, opts: Union[jobopts_t, joboptshc_t]) -> dict:
     """Get config with new parameter values, and log them w/ mlflow
 
     Also encode the parameters in a string to be used in file names.
@@ -247,7 +247,7 @@ def get_config(config: dict, opts: jobopts_t | joboptshc_t) -> dict:
 
 
 def write_config_json(
-    builddir: Path, fname: str, config: dict, opts: jobopts_t | joboptshc_t
+    builddir: Path, fname: str, config: dict, opts: Union[jobopts_t, joboptshc_t]
 ) -> tuple[Path, Path]:
     if opts.max_batch_size < 0:  # ghostbuster algorithm not included in sequence
         fname_part = mlflow_src_branch()
@@ -263,7 +263,7 @@ def write_config_json(
 
 
 def runner(
-    rundir: Path, config_edited: Path, jobopts: jobopts_t | joboptshc_t
+    rundir: Path, config_edited: Path, jobopts: Union[jobopts_t, joboptshc_t]
 ) -> dict[str, float]:
     """Run Allen with the configuration, and log the metrics w/ mlflow
 
@@ -333,7 +333,7 @@ def runner(
     return metrics
 
 
-def mlflow_run(expt_name: str, path: str, opts: jobopts_t | joboptshc_t):
+def mlflow_run(expt_name: str, path: str, opts: Union[jobopts_t, joboptshc_t]):
     """Wrapper to start an mlflow run"""
     expts = mlflow.search_experiments(filter_string=f"name = {expt_name!r}")
     if not expts:
