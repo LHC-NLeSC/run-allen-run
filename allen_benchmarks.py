@@ -186,6 +186,7 @@ benchmark_weights = dict(
         ("GhostProbabilityNN2", 200),
         ("GhostProbabilityNN3", 200),
         ("GhostProbabilityNN4", 200),
+        ("GhostProbabilityNN_HC", 200),
     ]
 )
 

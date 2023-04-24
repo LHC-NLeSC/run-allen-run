@@ -29,6 +29,7 @@ if [[ $branch =~ ghostbuster.* ]]; then
     for i in {1..5}; do
 	write_seq_2_json ghostbuster_test_n$i
     done
+    write_seq_2_json ghostbusterhc_test
 fi
 
 popd

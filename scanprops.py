@@ -148,6 +148,25 @@ def mlflow_src_branch() -> str:
 
 
 @dataclass
+class joboptshc_t:
+    max_batch_size: int
+    block_dim: tuple[int, int, int] = (256, 1, 1)
+    copies: int = 1
+
+    @property
+    def not_props(self):
+        return ["copies"]
+
+    @property
+    def fname_part(self):
+        """File path friendly string, encoded w/ parameter values"""
+        params = asdict(self)
+        fname_part = "batch-size-{max_batch_size}-"
+        fname_part += "block-dim-{block_dim[0]}-"
+        return fname_part.format(**params)
+
+
+@dataclass
 class jobopts_t:
     max_batch_size: int
     onnx_input: str
@@ -181,7 +200,7 @@ def onnx_input_name(onnx_input: str):
     return onnx.load(onnx_input).graph.input[0].name
 
 
-def get_config(config: dict, opts: jobopts_t) -> dict:
+def get_config(config: dict, opts: jobopts_t | joboptshc_t) -> dict:
     """Get config with new parameter values, and log them w/ mlflow
 
     Also encode the parameters in a string to be used in file names.
@@ -209,15 +228,20 @@ def get_config(config: dict, opts: jobopts_t) -> dict:
     """
     params = asdict(opts)
     mlflow.log_params(params)
-    for i in range(opts.copies):
-        config[f"GhostProbabilityNN{i}"].update(
+    if isinstance(opts, jobopts_t):  # onnx
+        for i in range(opts.copies):
+            config[f"GhostProbabilityNN{i}"].update(
+                (k, v) for k, v in params.items() if k not in opts.not_props
+            )
+    else:
+        config["GhostProbabilityNN_HC"].update(
             (k, v) for k, v in params.items() if k not in opts.not_props
         )
     return config
 
 
 def write_config_json(
-    builddir: Path, fname: str, config: dict, opts: jobopts_t
+    builddir: Path, fname: str, config: dict, opts: jobopts_t | joboptshc_t
 ) -> tuple[Path, Path]:
     if opts.max_batch_size < 0:  # ghostbuster algorithm not included in sequence
         fname_part = mlflow_src_branch()
@@ -232,7 +256,9 @@ def write_config_json(
     return rundir, config_edited
 
 
-def runner(rundir: Path, config_edited: Path, jobopts: jobopts_t) -> dict[str, float]:
+def runner(
+    rundir: Path, config_edited: Path, jobopts: jobopts_t | joboptshc_t
+) -> dict[str, float]:
     """Run Allen with the configuration, and log the metrics w/ mlflow
 
     Log files are saved in the run directory (logged as artifacts w/ mlflow):
@@ -301,7 +327,7 @@ def runner(rundir: Path, config_edited: Path, jobopts: jobopts_t) -> dict[str, f
     return metrics
 
 
-def mlflow_run(expt_name: str, path: str, opts: jobopts_t):
+def mlflow_run(expt_name: str, path: str, opts: jobopts_t | joboptshc_t):
     """Wrapper to start an mlflow run"""
     expts = mlflow.search_experiments(filter_string=f"name = {expt_name!r}")
     if not expts:
@@ -356,15 +382,20 @@ if __name__ == "__main__":
     )
 
     opts = parser.parse_args()
-    jobopts = jobopts_t(
-        max_batch_size=-1,  # dummy
-        no_infer=opts.no_infer,
-        use_fp16=opts.fp16,
-        use_int8=opts.int8,
-        onnx_input=opts.onnx_input,
-        input_name=onnx_input_name(opts.onnx_input),
-        copies=opts.copies,
-    )
+
+    jobopts: jobopts_t | joboptshc_t
+    if opts.onnx_input is None:
+        jobopts = joboptshc_t(max_batch_size=-1)
+    else:
+        jobopts = jobopts_t(
+            max_batch_size=-1,  # dummy
+            no_infer=opts.no_infer,
+            use_fp16=opts.fp16,
+            use_int8=opts.int8,
+            onnx_input=opts.onnx_input,
+            input_name=onnx_input_name(opts.onnx_input),
+            copies=opts.copies,
+        )
 
     if opts.batch_size_range is None:
         # dummy parameter values, they are ignored when ghostbuster isn't included
