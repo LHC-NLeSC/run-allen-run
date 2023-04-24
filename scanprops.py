@@ -306,7 +306,8 @@ def runner(rundir: Path, config_edited: Path, jobopts: opts_t) -> dict[str, floa
 
     with sh.cd(rundir):
         env = ENV.copy()
-        env["CUDA_VISIBLE_DEVICES"] = "0"
+        if "CUDA_VISIBLE_DEVICES" not in env:
+            env["CUDA_VISIBLE_DEVICES"] = "0"
         cmd, opts = ALLEN_CMD
         stdout = shtrip(
             sh.Command(cmd)(
