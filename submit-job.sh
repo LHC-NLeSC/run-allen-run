@@ -3,8 +3,9 @@
 # exclusive node
 #PBS -n
 #PBS -l nodes=1:v100
-#PBS -l walltime=96:00:00
+#PBS -l walltime=36:00:00
 #PBS -l mem=4gb
+#PBS -t 1-6%2
 
 pushd /project/bfys/$USER/codebaby/run-allen-run || exit
 
@@ -26,7 +27,9 @@ mlflow experiments search 2>/dev/null | grep -q v100 || \
 echo "Jobs w/ ghostbuster:" |& tee -a current.log
 cp -v ./allen_benchmarks.py Allen-ghostbuster/configuration/python/AllenCore/ |& tee -a current.log
 
-for i in {1..5}; do
+i=${PBS_ARRAYID}
+if [[ $i -lt 6 ]]; then
+    export CUDA_VISIBLE_DEVICES=$( (( $i % 2 )) )
     json_config=Allen-ghostbuster/build/ghostbuster_test_n${i}_seq.json
     [[ -f ${json_config} ]] || \
 	{
@@ -54,7 +57,22 @@ for i in {1..5}; do
 	       --onnx-input ${onnx_input} \
 	       --copies $i |& tee -a current.log
     done
-done
+else  # ghostbusterhc_test
+    export CUDA_VISIBLE_DEVICES=0
+    json_config=Allen-ghostbuster/build/ghostbusterhc_test_seq.json
+    [[ -f ${json_config} ]] || \
+	{
+	    echo "${json_config}: missing" |& tee -a current.log > /dev/stderr
+	    echo "Did you run ./prepare.sh?" |& tee -a current.log
+	    exit 2
+	}
+
+    echo "config: ${json_config}" |& tee -a current.log
+    python ./scanprops.py ${json_config} \
+	   --experiment-name v100 \
+	   --batch-size-range 1000 16000 \
+	   --block-dim-range 16 1024 |& tee -a current.log
+fi
 
 # echo "config: hlt1_pp_default_seq.json" |& tee -a current.log
 # python ./scanprops.py Allen-ghostbuster/build/hlt1_pp_default_seq.json \
