@@ -26,6 +26,11 @@ write_seq_2_json hlt1_pp_default
 
 if [[ $branch =~ ghostbuster.* ]]; then
     ../../genconf.py . --sequence ghostbuster_test --max-copies 5
+    retcode=$?
+    [[ $retcode -ne 0 ]] && {
+	echo "genconf.py: did you forget to run 'source venv/bin/activate'?"
+	exit $retcode
+    }
     for i in {1..5}; do
 	write_seq_2_json ghostbuster_test_n$i
     done
