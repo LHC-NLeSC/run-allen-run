@@ -28,10 +28,9 @@ mlflow experiments search 2>/dev/null | grep -q v100 || \
 echo "Jobs w/ ghostbuster:" |& tee -a $LOG
 cp -v ./allen_benchmarks.py Allen-ghostbuster/configuration/python/AllenCore/ |& tee -a $LOG
 
-i=${PBS_ARRAYID}
-if [[ $i -lt 6 ]]; then
     export CUDA_VISIBLE_DEVICES=$( (( $i % 2 )) )
-    json_config=Allen-ghostbuster/build/ghostbuster_test_n${i}_seq.json
+if [[ ${PBS_ARRAYID} -lt 6 ]]; then
+    json_config=Allen-ghostbuster/build/ghostbuster_test_n${PBS_ARRAYID}_seq.json
     [[ -f ${json_config} ]] || \
 	{
 	    echo "${json_config}: missing" |& tee -a $LOG > /dev/stderr
@@ -56,7 +55,7 @@ if [[ $i -lt 6 ]]; then
 	       --int8 \
 	       --no-infer \
 	       --onnx-input ${onnx_input} \
-	       --copies $i |& tee -a $LOG
+	       --copies ${PBS_ARRAYID} |& tee -a $LOG
     done
 else  # ghostbusterhc_test
     export CUDA_VISIBLE_DEVICES=0
