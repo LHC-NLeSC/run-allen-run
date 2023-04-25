@@ -5,7 +5,7 @@
 #PBS -l nodes=1:v100
 #PBS -l walltime=36:00:00
 #PBS -l mem=4gb
-#PBS -t 1-6%2
+#PBS -t 1-6
 
 pushd /project/bfys/$USER/codebaby/run-allen-run || exit
 
@@ -28,8 +28,8 @@ mlflow experiments search 2>/dev/null | grep -q v100 || \
 echo "Jobs w/ ghostbuster:" |& tee -a $LOG
 cp -v ./allen_benchmarks.py Allen-ghostbuster/configuration/python/AllenCore/ |& tee -a $LOG
 
-    export CUDA_VISIBLE_DEVICES=$( (( $i % 2 )) )
 if [[ ${PBS_ARRAYID} -lt 6 ]]; then
+    export CUDA_VISIBLE_DEVICES=0
     json_config=Allen-ghostbuster/build/ghostbuster_test_n${PBS_ARRAYID}_seq.json
     [[ -f ${json_config} ]] || \
 	{
