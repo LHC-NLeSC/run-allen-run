@@ -5,8 +5,10 @@
 The above plot shows the event rate against the batch size for the
 following scenarios:
 - multiple instances of `ghostbuster` (1-5)
-  - 5 and some points from 4 are missing, because the job ran out of time
-- `no_infer` means `ghostbuster` is loaded, but inference is skipped
-- load models of two different sizes (split in rows)
-- force FP16 during inference (split in columns)
-- baseline: run an "identical" sequence without `ghostbuster` (`master` @ 2022-12-01)
+- `baseline` is a `ghostbuster` run with inference skipped
+- load models of 4 different sizes: `ghost_nn{,big,bigger,tiny}`
+  - shown on different rows
+- runs with the `ghost_nn` model also compare a `handcoded` version of
+  the algorithm.  It includes a few simple optimisations.
+- TensorRT runs where FP16 optimisations have been enabled are shown
+  on the 2nd column
