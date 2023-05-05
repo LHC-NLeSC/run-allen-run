@@ -6,7 +6,7 @@ The above plot shows the event rate against the batch size for the
 following scenarios:
 - multiple instances of `ghostbuster` (1-5)
 - `baseline` is a `ghostbuster` run with inference skipped
-- load models of 4 different sizes: `ghost_nn{,big,bigger,tiny}`
+- load models of 4 different sizes: `ghost_nn{,_big,_bigger,_tiny}`
   - shown on different rows
 - runs with the `ghost_nn` model also compare a `handcoded` version of
   the algorithm.  It includes a few simple optimisations.
