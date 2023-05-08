@@ -16,6 +16,7 @@ from math import log2
 import os
 from pathlib import Path
 import re
+import sys
 from typing import Iterable, Union
 
 import mlflow
@@ -44,6 +45,28 @@ def shtrip(output: Union[sh.RunningCommand, None]) -> str:
     if output is None:
         return ""
     return repr(output).strip()
+
+
+def evt_rate_duration_from_log(log_text: str) -> tuple[float, float]:
+    """Parse event rate & duration from the last two lines of Allen log
+
+    Parameters
+    ----------
+    log_text : str
+        the log text
+
+    Returns
+    -------
+    tuple[float, float]
+        event rate and duration
+
+    """
+    event_rate, duration = [
+        float(match[0])
+        for line in log_text.splitlines()[-2:]
+        if (match := NUMBERS.search(line))
+    ]
+    return event_rate, duration
 
 
 def round_up_2(val: int) -> int:
@@ -317,12 +340,9 @@ def runner(rundir: Path, config_edited: Path, jobopts: opts_t) -> dict[str, floa
         log_file = Path(f"stdout-{fname_part}.log")
         log_file.write_text(stdout)
         try:
-            event_rate, duration = [
-                float(match[0])
-                for line in stdout.splitlines()[-2:]
-                if (match := NUMBERS.search(line))
-            ]
+            event_rate, duration = evt_rate_duration_from_log(stdout)
         except ValueError:
+            print("Couldn't parse event rate and duration from log", file=sys.stderr)
             event_rate, duration = -1.0, -1.0
         metrics = {"event_rate": event_rate, "duration": duration}
         meta_file = Path(f"meta-{fname_part}.json")
