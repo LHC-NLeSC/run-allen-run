@@ -1,14 +1,24 @@
 #!/usr/bin/env python
+"""Select runs from mlflow datastore using a TOML config file
+
+      [[runs.<name>]]
+      start = "2023-04-24 12:00"
+      stop = "2023-04-30 23:00"
+      seq = "<sequence>"
+
+Match against sequence name as `<sequence>*`
+
+"""
+
+from argparse import ArgumentParser
 import ast
 from io import StringIO
 from pathlib import Path
-from typing import cast
 
-import matplotlib.pyplot as plt
-import numpy as np
 import seaborn as sns
 import pandas as pd
 
+from scanprops import RawArgDefaultFormatter
 from selections import read_config_toml, select_runs
 
 keep_t = {
@@ -149,10 +159,7 @@ def get_facets(df: pd.DataFrame, use_fp16: bool = False, use_int8: bool = False)
 
 
 if __name__ == "__main__":
-    import argparse
-
-    doc = "Runs maybe filtered on date using --before/after"
-    parser = argparse.ArgumentParser(description=doc)
+    parser = ArgumentParser(description=__doc__, formatter_class=RawArgDefaultFormatter)
     parser.add_argument("toml_config", help="TOML file with run selection")
     opts = parser.parse_args()
 

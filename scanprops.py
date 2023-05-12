@@ -9,6 +9,11 @@ There are 3 modes:
 
 """
 
+from argparse import (
+    ArgumentParser,
+    ArgumentDefaultsHelpFormatter,
+    RawDescriptionHelpFormatter,
+)
 from dataclasses import asdict, dataclass
 from itertools import chain, product
 import json
@@ -22,6 +27,15 @@ from typing import Iterable, Union
 import mlflow
 import onnx
 import sh
+
+
+class RawArgDefaultFormatter(
+    ArgumentDefaultsHelpFormatter, RawDescriptionHelpFormatter
+):
+    """Combine raw help text formatting with default argument display."""
+
+    pass
+
 
 TEST_CMD = ["../foo.sh", "42 {config} --foo bar"]
 
@@ -387,19 +401,6 @@ def mlflow_run(expt_name: str, path: str, opts: opts_t):
 
 
 if __name__ == "__main__":
-    from argparse import (
-        ArgumentParser,
-        ArgumentDefaultsHelpFormatter,
-        RawDescriptionHelpFormatter,
-    )
-
-    class RawArgDefaultFormatter(
-        ArgumentDefaultsHelpFormatter, RawDescriptionHelpFormatter
-    ):
-        """Combine raw help text formatting with default argument display."""
-
-        pass
-
     parser = ArgumentParser(description=__doc__, formatter_class=RawArgDefaultFormatter)
     parser.add_argument(
         "config_json",
