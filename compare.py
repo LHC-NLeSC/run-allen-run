@@ -91,9 +91,9 @@ def df_extend_if(ghostbuster: pd.DataFrame, handcoded: pd.DataFrame) -> pd.DataF
         extend_batch(row, batch_sizes)
         for _, row in ghostbuster[baseline_idx].iterrows()
     ]
-    baseline_copy = ghostbuster[baseline_idx].copy()
+    baseline_copy = pd.concat(dfs, axis=0)
     baseline_copy.loc[:, "params.use_fp16"] = True
-    dfs.extend(extend_batch(row, batch_sizes) for _, row in baseline_copy.iterrows())
+    dfs.append(baseline_copy)
 
     # main benchmarks
     dfs.append(ghostbuster[~no_infer_idx])
@@ -102,12 +102,12 @@ def df_extend_if(ghostbuster: pd.DataFrame, handcoded: pd.DataFrame) -> pd.DataF
     handcoded.loc[:, "tags.branch"] = "handcoded"
     max_block_dim = handcoded["params.block_dim"].max()  # pick any value
     dfs.append(handcoded[handcoded["params.block_dim"] == max_block_dim])
-    return pd.concat(dfs, axis=0).reset_index(drop=True)
+    return (
+        pd.concat(dfs, axis=0).reset_index(drop=True).fillna(fill_vals).astype(keep_t)
+    )
 
 
 def get_facets(df: pd.DataFrame, use_fp16: bool = False, use_int8: bool = False):
-    df = df.astype(keep_t)
-    df.info()
     if use_int8 and use_fp16:
         raise ValueError("Cannot use both fp16 and int8")
     elif use_fp16 and not use_int8:
