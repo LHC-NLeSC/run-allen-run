@@ -16,6 +16,7 @@ from io import StringIO
 from pathlib import Path
 
 import seaborn as sns
+from numpy.testing import assert_
 import pandas as pd
 
 from scanprops import RawArgDefaultFormatter
@@ -84,8 +85,11 @@ def process_df(df) -> pd.DataFrame:
     return df.loc[:, [col for col in keep if col in df.columns]]
 
 
-def df_extend_if(ghostbuster: pd.DataFrame, handcoded: pd.DataFrame) -> pd.DataFrame:
+def df_extend_if(
+    ghostbuster: pd.DataFrame, handcoded: pd.DataFrame, flag: str
+) -> pd.DataFrame:
     """Extend the dataframe from ghostbuster jobs for easier plotting"""
+    assert_(flag in ("fp16", "int8", ""))
 
     def extend_batch(row, sizes, onnx=None):
         res = pd.concat([row] * len(sizes), axis=1).T
@@ -102,9 +106,10 @@ def df_extend_if(ghostbuster: pd.DataFrame, handcoded: pd.DataFrame) -> pd.DataF
         extend_batch(row, batch_sizes)
         for _, row in ghostbuster[baseline_idx].iterrows()
     ]
-    baseline_copy = pd.concat(dfs, axis=0)
-    baseline_copy.loc[:, "params.use_fp16"] = True
-    dfs.append(baseline_copy)
+    if flag:
+        baseline_copy = pd.concat(dfs, axis=0)
+        baseline_copy.loc[:, f"params.use_{flag}"] = True
+        dfs.append(baseline_copy)
 
     # main benchmarks
     dfs.append(ghostbuster[~no_infer_idx])
@@ -118,15 +123,14 @@ def df_extend_if(ghostbuster: pd.DataFrame, handcoded: pd.DataFrame) -> pd.DataF
     )
 
 
-def get_facets(df: pd.DataFrame, use_fp16: bool = False, use_int8: bool = False):
-    if use_int8 and use_fp16:
-        raise ValueError("Cannot use both fp16 and int8")
-    elif use_fp16 and not use_int8:
-        df = df[~df["params.use_int8"]]
-        facet_col = {"col": "params.use_fp16"}
-    elif use_int8 and not use_fp16:
-        df = df[~df["params.use_fp16"]]
-        facet_col = {"col": "params.use_int8"}
+def get_facets(ghostbuster: pd.DataFrame, handcoded: pd.DataFrame, flag: str):
+    flags = {"fp16", "int8", ""}
+    assert_(flag in flags)
+    df = df_extend_if(ghostbuster, handcoded, flag)
+    other, *_ = [f for f in flags - {flag} if f != ""]
+    if flag:
+        df = df[~df[f"params.use_{other}"]]
+        facet_col = {"col": f"params.use_{flag}"}
     else:
         df = df[~df["params.use_int8"] & ~df["params.use_fp16"]]
         facet_col = {}
@@ -161,6 +165,12 @@ def get_facets(df: pd.DataFrame, use_fp16: bool = False, use_int8: bool = False)
 if __name__ == "__main__":
     parser = ArgumentParser(description=__doc__, formatter_class=RawArgDefaultFormatter)
     parser.add_argument("toml_config", help="TOML file with run selection")
+    parser.add_argument(
+        "--flag",
+        choices=["fp16", "int8", ""],
+        default="",
+        help="Plot runs with TensorRT optimisation flag",
+    )
     opts = parser.parse_args()
 
     selections = read_config_toml(opts.toml_config)["runs"].items()
@@ -168,7 +178,7 @@ if __name__ == "__main__":
         select_runs([sel[0].values()]).pipe(df_round_trip).pipe(process_df)
         for run, sel in selections
     ]
-    df_plot = df_extend_if(ghostbuster, handcoded)
 
-    facets = get_facets(df_plot, use_fp16=True)
-    facets.savefig("evt-rate-vs-batch-size-comparison.png")
+    facets = get_facets(ghostbuster, handcoded, opts.flag)
+    suffix = f"-{opts.flag}" if opts.flag else ""
+    facets.savefig(f"evt-rate-vs-batch-size-comparison{suffix}.png")
