@@ -1,0 +1,9 @@
+[[runs.ghostbuster]]
+start = "2023-04-24 12:00"
+stop = "2023-04-30 23:00"
+seq = "ghostbuster_"
+
+[[runs.handcoded]]
+start = "2023-05-03 12:00"
+stop = "2023-05-11 23:00"
+seq = "ghostbusterhc_"
