@@ -9,6 +9,7 @@ import numpy as np
 import seaborn as sns
 import pandas as pd
 
+from selections import read_config_toml, select_runs
 
 keep_t = {
     "status": "category",
@@ -152,23 +153,15 @@ if __name__ == "__main__":
 
     doc = "Runs maybe filtered on date using --before/after"
     parser = argparse.ArgumentParser(description=doc)
-    parser.add_argument("csv", help="CSV file with run statistics")
-    parser.add_argument(
-        "--after",
-        default="",
-        help="Datetime string (%%Y-%%m-%%d %%H:%%M:%%s) to filter runs",
-    )
-    parser.add_argument(
-        "--before",
-        default="",
-        help="Datetime string (%%Y-%%m-%%d %%H:%%M:%%s) to filter runs",
-    )
+    parser.add_argument("toml_config", help="TOML file with run selection")
     opts = parser.parse_args()
 
-    df = get_df(opts.csv, after=opts.after, before=opts.before)
-    ghostbuster = df[df["params.sequence"].str.startswith("ghostbuster_")]
-    ghostbusterhc = df[df["params.sequence"].str.startswith("ghostbusterhc_")]
-    df_plot = df_extend_if(ghostbuster, ghostbusterhc)
+    selections = read_config_toml(opts.toml_config)["runs"].items()
+    ghostbuster, handcoded = [
+        select_runs([sel[0].values()]).pipe(df_round_trip).pipe(process_df)
+        for run, sel in selections
+    ]
+    df_plot = df_extend_if(ghostbuster, handcoded)
 
     facets = get_facets(df_plot, use_fp16=True)
     facets.savefig("evt-rate-vs-batch-size-comparison.png")
