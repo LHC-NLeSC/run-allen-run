@@ -43,12 +43,13 @@ def parse_metrics(df):
             log_file, *_ = Path(row["artifact_uri"]).glob("stdout-*")
             try:
                 log_txt = read_corrupt_logs(log_file)
-                evt_rate, duration = evt_rate_duration_from_log(log_txt)
+                event_rate, duration = evt_rate_duration_from_log(log_txt)
             except ValueError:
                 print(f"Failed to parse log file: {log_file}")
                 # print_corrupt_logs(log_file)
                 continue
-            mlflow.log_metric("evt_rate", evt_rate)
+            # print(f"{row['run_id']}, {row['tags.mlflow.runName']}, {event_rate=}, {duration=}")
+            mlflow.log_metric("event_rate", event_rate)
             mlflow.log_metric("duration", duration)
 
 
