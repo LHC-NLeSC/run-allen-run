@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 import ast
+from io import StringIO
 from pathlib import Path
 from typing import cast
 
@@ -43,6 +44,11 @@ dbg_cols = [
     "tags.branch",
     "params.max_batch_size",
 ]
+
+
+def df_round_trip(df: pd.DataFrame) -> pd.DataFrame:
+    """Round trip the dataframe through CSV to convert the columns to correct dtypes"""
+    return pd.read_csv(StringIO(df.to_csv(index=False)))
 
 
 def process_df(df) -> pd.DataFrame:
