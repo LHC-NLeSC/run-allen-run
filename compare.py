@@ -8,10 +8,9 @@ import numpy as np
 import seaborn as sns
 import pandas as pd
 
-rename = {"Duration": "job_duration"}
-# convert to seconds: pd.to_timedelta(df["job_duration"]).dt.total_seconds()
 
 keep_t = {
+    "status": "category",
     "params.copies": int,
     "params.block_dim": int,
     "params.max_batch_size": int,
@@ -23,10 +22,18 @@ keep_t = {
     "metrics.duration": float,
     "metrics.event_rate": float,
     "tags.branch": "category",
-    "tags.mlflow.runname": "string",
+    "tags.mlflow.runName": "string",
 }
 
 keep = ["start_time", *keep_t]
+
+fill_vals = {
+    "params.copies": 1,
+    "params.onnx_input": "ghost_nn",
+    "params.no_infer": False,
+    "params.use_fp16": False,
+    "params.use_int8": False,
+}
 
 dbg_cols = [
     "params.copies",
@@ -38,42 +45,26 @@ dbg_cols = [
 ]
 
 
-def get_df(csv, before: str = "", after: str = "") -> pd.DataFrame:
-    df = cast(pd.DataFrame, pd.read_csv(csv, index_col=0)).rename(columns=rename)
-    df.columns = df.columns.str.replace(" ", "_").str.casefold()
+def process_df(df) -> pd.DataFrame:
+    # dates = ("start_time", "end_time")
+    # for col in dates:
+    #     if col in df.columns:
+    #         df[col] = pd.to_datetime(df[col])
 
-    queries = ["status == 'FINISHED'"]  # drop failed/incomplete jobs
-    if before:
-        queries += [f"start_time < {before!r}"]
-    if after:
-        queries += [f"start_time > {after!r}"]
-    query = "&".join([f"({q})" for q in queries])
-    df = df.query(query).copy()
+    df["params.block_dim"] = df["params.block_dim"].map(
+        lambda x: ast.literal_eval(x)[0]
+    )
+    df = df.fillna(fill_vals)
+    if "params.onnx_input" in df.columns:
+        df["params.onnx_input"] = df["params.onnx_input"].map(lambda p: Path(p).stem)
+    else:
+        # handcoded algorithm is based on the default model (ghost_nn)
+        df.loc[:, "params.onnx_input"] = fill_vals["params.onnx_input"]
 
-    if "params.block_dim" in df.columns:
-        df["params.block_dim"] = df["params.block_dim"].map(
-            lambda x: ast.literal_eval(x)[0]
-        )
-
-    dates = ["start_time"]
-    for col in dates:
-        if col in df.columns:
-            df[col] = pd.to_datetime(df[col])
-
-    bools = ["params.no_infer", "params.use_fp16", "params.use_int8"]
-    for col in bools:
-        if col in df.columns:
-            df.loc[:, col] = df[col].fillna(False)
-
-    if all(map(lambda i: i in df.columns, ("params.copies", "params.onnx_input"))):
-        # copies is 1 by default
-        df["params.copies"] = df["params.copies"].fillna(1).infer_objects()
-        # onnx_input is missing for hand coded, but it is based on ghost_nn
-        df["params.onnx_input"] = (
-            df["params.onnx_input"].fillna("ghost_nn").map(lambda p: Path(p).stem)
-        )
-
-    return df.loc[:, keep].convert_dtypes()
+    df = df.astype({k: v for k, v in keep_t.items() if k in df.columns})
+    # add categories now to avoid NaN later
+    df["tags.branch"] = df["tags.branch"].cat.add_categories(["baseline", "handcoded"])
+    return df.loc[:, [col for col in keep if col in df.columns]]
 
 
 def df_extend_if(ghostbuster: pd.DataFrame, handcoded: pd.DataFrame) -> pd.DataFrame:
