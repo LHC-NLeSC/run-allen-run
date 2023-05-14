@@ -22,7 +22,7 @@ import pandas as pd
 from scanprops import RawArgDefaultFormatter
 from selections import read_config_toml, select_runs
 
-keep_t = {
+col_t = {
     "status": "category",
     "params.copies": int,
     "params.block_dim": int,
@@ -36,9 +36,10 @@ keep_t = {
     "metrics.event_rate": float,
     "tags.branch": "category",
     "tags.mlflow.runName": "string",
+    "optimisation": "category",
 }
 
-keep = ["start_time", *keep_t]
+keep = ["start_time", *[c for c in col_t if "use_" not in c]]
 
 fill_vals = {
     "params.copies": 1,
@@ -63,6 +64,10 @@ def df_round_trip(df: pd.DataFrame) -> pd.DataFrame:
     return pd.read_csv(StringIO(df.to_csv(index=False)))
 
 
+def df_col_t(df) -> dict[str, type | str]:
+    return {k: v for k, v in col_t.items() if k in df.columns}
+
+
 def process_df(df) -> pd.DataFrame:
     # dates = ("start_time", "end_time")
     # for col in dates:
@@ -79,9 +84,26 @@ def process_df(df) -> pd.DataFrame:
         # handcoded algorithm is based on the default model (ghost_nn)
         df.loc[:, "params.onnx_input"] = fill_vals["params.onnx_input"]
 
-    df = df.astype({k: v for k, v in keep_t.items() if k in df.columns})
-    # add categories now to avoid NaN later
+    df = df.astype(df_col_t(df))
+
+    # encode optimisation flags as category
+    if any("use_" in col for col in df.columns):
+        opt_one_hot_encoded = pd.concat(
+            [
+                df["params.use_fp16"].rename("fp16"),
+                df["params.use_int8"].rename("int8"),
+                (~df["params.use_fp16"] & ~df["params.use_int8"]).rename("none"),
+            ],
+            axis=1,
+        )
+        opt = pd.from_dummies(opt_one_hot_encoded).astype("category").iloc[:, 0]
+        df = df.assign(optimisation=opt)
+    else:
+        df = df.assign(optimisation="none")
+
+    # add categories to branch now to avoid NaN later
     df["tags.branch"] = df["tags.branch"].cat.add_categories(["baseline", "handcoded"])
+
     return df.loc[:, [col for col in keep if col in df.columns]]
 
 
@@ -89,7 +111,7 @@ def df_extend_if(
     ghostbuster: pd.DataFrame, handcoded: pd.DataFrame, flag: str
 ) -> pd.DataFrame:
     """Extend the dataframe from ghostbuster jobs for easier plotting"""
-    assert_(flag in ("fp16", "int8", ""))
+    assert_(flag in ("fp16", "int8", "none", "both"))
 
     def extend_batch(row, sizes, onnx=None):
         res = pd.concat([row] * len(sizes), axis=1).T
@@ -106,10 +128,17 @@ def df_extend_if(
         extend_batch(row, batch_sizes)
         for _, row in ghostbuster[baseline_idx].iterrows()
     ]
-    if flag:
-        baseline_copy = pd.concat(dfs, axis=0)
-        baseline_copy.loc[:, f"params.use_{flag}"] = True
-        dfs.append(baseline_copy)
+
+    def extend_optimisation(df, flag):
+        df.loc[:, "optimisation"] = flag
+        return df
+
+    if flag != "none":
+        _baseline = pd.concat(dfs, axis=0)
+        if flag in ("both", "fp16"):
+            dfs.append(extend_optimisation(_baseline.copy(), "fp16"))
+        if flag in ("both", "int8"):
+            dfs.append(extend_optimisation(_baseline.copy(), "int8"))
 
     # main benchmarks
     dfs.append(ghostbuster[~no_infer_idx])
@@ -118,22 +147,19 @@ def df_extend_if(
     handcoded.loc[:, "tags.branch"] = "handcoded"
     max_block_dim = handcoded["params.block_dim"].max()  # pick any value
     dfs.append(handcoded[handcoded["params.block_dim"] == max_block_dim])
-    return (
-        pd.concat(dfs, axis=0).reset_index(drop=True).fillna(fill_vals).astype(keep_t)
-    )
+    df = pd.concat(dfs, axis=0).reset_index(drop=True).fillna(fill_vals)
+    return df.astype(df_col_t(df))
 
 
 def get_facets(ghostbuster: pd.DataFrame, handcoded: pd.DataFrame, flag: str):
-    flags = {"fp16", "int8", ""}
+    flags = {"fp16", "int8", "none", "both"}
     assert_(flag in flags)
     df = df_extend_if(ghostbuster, handcoded, flag)
-    other, *_ = [f for f in flags - {flag} if f != ""]
-    if flag:
-        df = df[~df[f"params.use_{other}"]]
-        facet_col = {"col": f"params.use_{flag}"}
-    else:
-        df = df[~df["params.use_int8"] & ~df["params.use_fp16"]]
-        facet_col = {}
+
+    if flag != "both":
+        df = df[df["optimisation"] == flag]
+        df.loc[:, "optimisation"] = df["optimisation"].cat.remove_unused_categories()
+    facet_col = {} if flag == "none" else {"col": "optimisation"}
 
     if all(map(lambda i: i in df.columns, ("params.copies", "params.onnx_input"))):
         max_copies = int(df["params.copies"].max())
@@ -167,8 +193,8 @@ if __name__ == "__main__":
     parser.add_argument("toml_config", help="TOML file with run selection")
     parser.add_argument(
         "--flag",
-        choices=["fp16", "int8", ""],
-        default="",
+        choices=["both", "fp16", "int8", "none"],
+        default="both",
         help="Plot runs with TensorRT optimisation flag",
     )
     opts = parser.parse_args()
@@ -180,5 +206,5 @@ if __name__ == "__main__":
     ]
 
     facets = get_facets(ghostbuster, handcoded, opts.flag)
-    suffix = f"-{opts.flag}" if opts.flag else ""
+    suffix = f"-{opts.flag}" if opts.flag != "none" else ""
     facets.savefig(f"evt-rate-vs-batch-size-comparison{suffix}.png")
